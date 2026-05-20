@@ -52,6 +52,7 @@ func main() {
 	go h.Run()
 
 	snapshotter := stream.NewSnapshotter(rdb, mongoDB)
+	defer snapshotter.Close()
 	go snapshotter.Start(context.Background())
 
 	// WebSocket HTTP server

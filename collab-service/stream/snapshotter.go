@@ -2,11 +2,14 @@ package stream
 
 import (
 	"context"
+	"encoding/json"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -19,13 +22,47 @@ const (
 	checkInterval  = 1 * time.Second
 )
 
+const mqQueue = "doc.index"
+
 type Snapshotter struct {
 	rdb     *redis.Client
 	mongoDB *mongo.Database
+	mqCh    *amqp.Channel
+	mqConn  *amqp.Connection
 }
 
 func NewSnapshotter(rdb *redis.Client, mongoDB *mongo.Database) *Snapshotter {
-	return &Snapshotter{rdb: rdb, mongoDB: mongoDB}
+	s := &Snapshotter{rdb: rdb, mongoDB: mongoDB}
+
+	mqURL := os.Getenv("RABBITMQ_URL")
+	if mqURL == "" {
+		mqURL = "amqp://guest:guest@localhost:5672/"
+	}
+	conn, err := amqp.Dial(mqURL)
+	if err != nil {
+		log.Printf("snapshotter: rabbitmq connect failed (index disabled): %v", err)
+		return s
+	}
+	ch, err := conn.Channel()
+	if err != nil {
+		conn.Close()
+		log.Printf("snapshotter: rabbitmq channel failed: %v", err)
+		return s
+	}
+	ch.QueueDeclare(mqQueue, true, false, false, false, nil)
+	s.mqConn = conn
+	s.mqCh = ch
+	log.Printf("snapshotter: rabbitmq connected, queue=%s", mqQueue)
+	return s
+}
+
+func (s *Snapshotter) Close() {
+	if s.mqCh != nil {
+		s.mqCh.Close()
+	}
+	if s.mqConn != nil {
+		s.mqConn.Close()
+	}
 }
 
 func (s *Snapshotter) Start(ctx context.Context) {
@@ -111,6 +148,32 @@ func (s *Snapshotter) mergeStream(ctx context.Context, streamKey, docID, trigger
 	s.rdb.XDel(ctx, streamKey, ids...)
 
 	log.Printf("snapshot: doc=%s merged %d updates (%s trigger)", docID, len(msgs), trigger)
+
+	s.publishIndex(ctx, oid, lastPayload)
+}
+
+func (s *Snapshotter) publishIndex(ctx context.Context, oid primitive.ObjectID, content string) {
+	if s.mqCh == nil {
+		return
+	}
+	var doc struct {
+		Title string `bson:"title"`
+	}
+	s.mongoDB.Collection("documents").FindOne(ctx, bson.M{"_id": oid}).Decode(&doc)
+
+	body, _ := json.Marshal(map[string]string{
+		"doc_id":  oid.Hex(),
+		"title":   doc.Title,
+		"content": content,
+	})
+	pubCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := s.mqCh.PublishWithContext(pubCtx, "", mqQueue, false, false, amqp.Publishing{
+		ContentType: "application/json",
+		Body:        body,
+	}); err != nil {
+		log.Printf("snapshot: publish index for %s failed: %v", oid.Hex(), err)
+	}
 }
 
 func parseStreamTime(id string) time.Time {
