@@ -20,6 +20,7 @@ import (
 	collabpb "github.com/spike/goTogether/proto/collab"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -89,7 +90,7 @@ func main() {
 		registry.Register(context.Background(), "collab-service", "collab-service:"+grpcPort)
 	}
 
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 	collabpb.RegisterCollabServiceServer(grpcSrv, service.NewCollabService(h))
 	go func() {
 		log.Printf("collab-service grpc listening on :%s", grpcPort)

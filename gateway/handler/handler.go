@@ -13,6 +13,7 @@ import (
 	userpb "github.com/spike/goTogether/proto/user"
 	docpb "github.com/spike/goTogether/proto/doc"
 	searchpb "github.com/spike/goTogether/proto/search"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -36,7 +37,10 @@ func (h *Handler) dialService(serviceName, envKey, defaultAddr string) (*grpc.Cl
 	if addr == "" {
 		addr = defaultAddr
 	}
-	return grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	return grpc.NewClient(addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+	)
 }
 
 func (h *Handler) Register(c *gin.Context) {

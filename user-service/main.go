@@ -14,6 +14,7 @@ import (
 	"github.com/spike/goTogether/pkg/tracing"
 	userpb "github.com/spike/goTogether/proto/user"
 	"github.com/spike/goTogether/user-service/service"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -54,7 +55,7 @@ func main() {
 		registry.Register(context.Background(), "user-service", "user-service:"+port)
 	}
 
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 	userpb.RegisterUserServiceServer(srv, service.NewUserService(db))
 
 	go func() {

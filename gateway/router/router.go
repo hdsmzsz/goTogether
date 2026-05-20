@@ -7,12 +7,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spike/goTogether/gateway/handler"
 	"github.com/spike/goTogether/pkg/middleware"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func Setup(h *handler.Handler) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors())
+	r.Use(otelgin.Middleware("gateway"))
 	r.Use(middleware.PrometheusMetrics())
 
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))

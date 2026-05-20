@@ -16,6 +16,7 @@ import (
 	searchpb "github.com/spike/goTogether/proto/search"
 	"github.com/spike/goTogether/search-service/consumer"
 	"github.com/spike/goTogether/search-service/service"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -67,7 +68,7 @@ func main() {
 		registry.Register(context.Background(), "search-service", "search-service:"+port)
 	}
 
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 	searchpb.RegisterSearchServiceServer(srv, indexer)
 
 	go func() {
