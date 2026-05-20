@@ -53,6 +53,7 @@ type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 	broadcast  chan *Message
+	streamCh   chan *Message
 }
 
 type Message struct {
@@ -63,6 +64,8 @@ type Message struct {
 	Payload []byte  `json:"payload"`
 }
 
+const streamWorkers = 4
+
 func NewHub(rdb *redis.Client, mongoDB *mongo.Database) *Hub {
 	return &Hub{
 		rooms:      make(map[string]map[*Client]bool),
@@ -71,10 +74,15 @@ func NewHub(rdb *redis.Client, mongoDB *mongo.Database) *Hub {
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		broadcast:  make(chan *Message, 256),
+		streamCh:   make(chan *Message, 4096),
 	}
 }
 
 func (h *Hub) Run() {
+	for i := 0; i < streamWorkers; i++ {
+		go h.streamWriter()
+	}
+
 	for {
 		select {
 		case client := <-h.register:
@@ -106,7 +114,10 @@ func (h *Hub) Run() {
 		case msg := <-h.broadcast:
 			wsMsgSent.Inc()
 			if msg.Type == "update" {
-				h.appendToStream(msg)
+				select {
+				case h.streamCh <- msg:
+				default:
+				}
 			}
 			outbound, err := json.Marshal(map[string]interface{}{
 				"type":    msg.Type,
@@ -117,19 +128,32 @@ func (h *Hub) Run() {
 				log.Printf("marshal broadcast: %v", err)
 				continue
 			}
+
 			h.mu.RLock()
+			targets := make([]*Client, 0, len(h.rooms[msg.DocID]))
 			for client := range h.rooms[msg.DocID] {
-				if client == msg.Sender {
-					continue
-				}
-				select {
-				case client.Send <- outbound:
-				default:
-					go func(c *Client) { h.unregister <- c }(client)
+				if client != msg.Sender {
+					targets = append(targets, client)
 				}
 			}
 			h.mu.RUnlock()
+
+			for _, c := range targets {
+				go func(c *Client) {
+					select {
+					case c.Send <- outbound:
+					default:
+						h.unregister <- c
+					}
+				}(c)
+			}
 		}
+	}
+}
+
+func (h *Hub) streamWriter() {
+	for msg := range h.streamCh {
+		h.appendToStream(msg)
 	}
 }
 
