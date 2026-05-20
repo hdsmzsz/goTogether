@@ -147,12 +147,16 @@ services:
       dockerfile: doc-service/Dockerfile
     environment:
       DOC_SERVICE_PORT: "9002"
+      DOC_METRICS_PORT: "9102"
       MONGO_URI: "mongodb://mongodb:27017"
+      REDIS_ADDR: "redis:6379"
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       ETCD_ENDPOINTS: "etcd:2379"
       OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4318"
     depends_on:
       mongodb:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy

@@ -2,9 +2,13 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/redis/go-redis/v9"
 	"github.com/spike/goTogether/doc-service/mq"
 	docpb "github.com/spike/goTogether/proto/doc"
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,6 +18,19 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+var (
+	cacheHits = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "doc_cache_hits_total",
+		Help: "Total number of document metadata cache hits",
+	})
+	cacheMisses = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "doc_cache_misses_total",
+		Help: "Total number of document metadata cache misses",
+	})
+)
+
+const cacheTTL = 5 * time.Minute
 
 type Document struct {
 	ID            primitive.ObjectID `bson:"_id,omitempty"`
@@ -29,10 +46,51 @@ type DocService struct {
 	docpb.UnimplementedDocServiceServer
 	coll *mongo.Collection
 	pub  *mq.Publisher
+	rdb  *redis.Client
 }
 
-func NewDocService(db *mongo.Database, pub *mq.Publisher) *DocService {
-	return &DocService{coll: db.Collection("documents"), pub: pub}
+func NewDocService(db *mongo.Database, pub *mq.Publisher, rdb *redis.Client) *DocService {
+	return &DocService{coll: db.Collection("documents"), pub: pub, rdb: rdb}
+}
+
+func cacheKey(docID string) string { return "doc:meta:" + docID }
+
+func (s *DocService) cacheGet(ctx context.Context, docID string) (*docpb.DocDetail, bool) {
+	if s.rdb == nil {
+		return nil, false
+	}
+	raw, err := s.rdb.Get(ctx, cacheKey(docID)).Result()
+	if err != nil {
+		cacheMisses.Inc()
+		return nil, false
+	}
+	var detail docpb.DocDetail
+	if err := json.Unmarshal([]byte(raw), &detail); err != nil {
+		cacheMisses.Inc()
+		return nil, false
+	}
+	cacheHits.Inc()
+	return &detail, true
+}
+
+func (s *DocService) cacheSet(ctx context.Context, detail *docpb.DocDetail) {
+	if s.rdb == nil {
+		return
+	}
+	raw, err := json.Marshal(detail)
+	if err != nil {
+		return
+	}
+	if err := s.rdb.Set(ctx, cacheKey(detail.DocId), raw, cacheTTL).Err(); err != nil {
+		log.Printf("cache set %s: %v", detail.DocId, err)
+	}
+}
+
+func (s *DocService) cacheDel(ctx context.Context, docID string) {
+	if s.rdb == nil {
+		return
+	}
+	s.rdb.Del(ctx, cacheKey(docID))
 }
 
 func (s *DocService) CreateDoc(ctx context.Context, req *docpb.CreateDocRequest) (*docpb.DocInfo, error) {
@@ -50,7 +108,6 @@ func (s *DocService) CreateDoc(ctx context.Context, req *docpb.CreateDocRequest)
 	}
 	oid := result.InsertedID.(primitive.ObjectID)
 
-	// Publish to RabbitMQ for search indexing
 	if s.pub != nil {
 		if err := s.pub.Publish(mq.IndexMessage{
 			DocID:   oid.Hex(),
@@ -71,6 +128,10 @@ func (s *DocService) CreateDoc(ctx context.Context, req *docpb.CreateDocRequest)
 }
 
 func (s *DocService) GetDoc(ctx context.Context, req *docpb.GetDocRequest) (*docpb.DocDetail, error) {
+	if cached, ok := s.cacheGet(ctx, req.DocId); ok {
+		return cached, nil
+	}
+
 	oid, err := primitive.ObjectIDFromHex(req.DocId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid doc_id")
@@ -79,15 +140,17 @@ func (s *DocService) GetDoc(ctx context.Context, req *docpb.GetDocRequest) (*doc
 	if err := s.coll.FindOne(ctx, bson.M{"_id": oid}).Decode(&doc); err != nil {
 		return nil, status.Errorf(codes.NotFound, "doc not found")
 	}
-	return &docpb.DocDetail{
+	detail := &docpb.DocDetail{
 		DocId:         doc.ID.Hex(),
 		Title:         doc.Title,
-		OwnerId:      doc.OwnerID,
+		OwnerId:       doc.OwnerID,
 		Content:       doc.Content,
 		Collaborators: doc.Collaborators,
 		CreatedAt:     doc.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:     doc.UpdatedAt.Format(time.RFC3339),
-	}, nil
+	}
+	s.cacheSet(ctx, detail)
+	return detail, nil
 }
 
 func (s *DocService) ListDocs(ctx context.Context, req *docpb.ListDocsRequest) (*docpb.ListDocsResponse, error) {
@@ -140,7 +203,8 @@ func (s *DocService) UpdateDoc(ctx context.Context, req *docpb.UpdateDocRequest)
 		return nil, status.Errorf(codes.Internal, "update doc: %v", err)
 	}
 
-	// Publish to RabbitMQ for search indexing
+	s.cacheDel(ctx, req.DocId)
+
 	if s.pub != nil {
 		if err := s.pub.Publish(mq.IndexMessage{
 			DocID:   req.DocId,
@@ -163,6 +227,9 @@ func (s *DocService) DeleteDoc(ctx context.Context, req *docpb.DeleteDocRequest)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "delete: %v", err)
 	}
+	if result.DeletedCount > 0 {
+		s.cacheDel(ctx, req.DocId)
+	}
 	return &docpb.DeleteDocResponse{Success: result.DeletedCount > 0}, nil
 }
 
@@ -181,6 +248,7 @@ func (s *DocService) ShareDoc(ctx context.Context, req *docpb.ShareDocRequest) (
 	if result.MatchedCount == 0 {
 		return nil, status.Errorf(codes.PermissionDenied, "not the document owner")
 	}
+	s.cacheDel(ctx, req.DocId)
 	return &docpb.ShareDocResponse{Success: true}, nil
 }
 
