@@ -22,6 +22,7 @@ const (
 	DocService_CreateDoc_FullMethodName   = "/doc.DocService/CreateDoc"
 	DocService_GetDoc_FullMethodName      = "/doc.DocService/GetDoc"
 	DocService_ListDocs_FullMethodName    = "/doc.DocService/ListDocs"
+	DocService_UpdateDoc_FullMethodName   = "/doc.DocService/UpdateDoc"
 	DocService_DeleteDoc_FullMethodName   = "/doc.DocService/DeleteDoc"
 	DocService_UploadImage_FullMethodName = "/doc.DocService/UploadImage"
 )
@@ -33,6 +34,7 @@ type DocServiceClient interface {
 	CreateDoc(ctx context.Context, in *CreateDocRequest, opts ...grpc.CallOption) (*DocInfo, error)
 	GetDoc(ctx context.Context, in *GetDocRequest, opts ...grpc.CallOption) (*DocDetail, error)
 	ListDocs(ctx context.Context, in *ListDocsRequest, opts ...grpc.CallOption) (*ListDocsResponse, error)
+	UpdateDoc(ctx context.Context, in *UpdateDocRequest, opts ...grpc.CallOption) (*DocDetail, error)
 	DeleteDoc(ctx context.Context, in *DeleteDocRequest, opts ...grpc.CallOption) (*DeleteDocResponse, error)
 	UploadImage(ctx context.Context, in *UploadImageRequest, opts ...grpc.CallOption) (*UploadImageResponse, error)
 }
@@ -75,6 +77,16 @@ func (c *docServiceClient) ListDocs(ctx context.Context, in *ListDocsRequest, op
 	return out, nil
 }
 
+func (c *docServiceClient) UpdateDoc(ctx context.Context, in *UpdateDocRequest, opts ...grpc.CallOption) (*DocDetail, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DocDetail)
+	err := c.cc.Invoke(ctx, DocService_UpdateDoc_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *docServiceClient) DeleteDoc(ctx context.Context, in *DeleteDocRequest, opts ...grpc.CallOption) (*DeleteDocResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteDocResponse)
@@ -102,6 +114,7 @@ type DocServiceServer interface {
 	CreateDoc(context.Context, *CreateDocRequest) (*DocInfo, error)
 	GetDoc(context.Context, *GetDocRequest) (*DocDetail, error)
 	ListDocs(context.Context, *ListDocsRequest) (*ListDocsResponse, error)
+	UpdateDoc(context.Context, *UpdateDocRequest) (*DocDetail, error)
 	DeleteDoc(context.Context, *DeleteDocRequest) (*DeleteDocResponse, error)
 	UploadImage(context.Context, *UploadImageRequest) (*UploadImageResponse, error)
 	mustEmbedUnimplementedDocServiceServer()
@@ -122,6 +135,9 @@ func (UnimplementedDocServiceServer) GetDoc(context.Context, *GetDocRequest) (*D
 }
 func (UnimplementedDocServiceServer) ListDocs(context.Context, *ListDocsRequest) (*ListDocsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListDocs not implemented")
+}
+func (UnimplementedDocServiceServer) UpdateDoc(context.Context, *UpdateDocRequest) (*DocDetail, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateDoc not implemented")
 }
 func (UnimplementedDocServiceServer) DeleteDoc(context.Context, *DeleteDocRequest) (*DeleteDocResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteDoc not implemented")
@@ -204,6 +220,24 @@ func _DocService_ListDocs_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DocService_UpdateDoc_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateDocRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DocServiceServer).UpdateDoc(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DocService_UpdateDoc_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DocServiceServer).UpdateDoc(ctx, req.(*UpdateDocRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DocService_DeleteDoc_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteDocRequest)
 	if err := dec(in); err != nil {
@@ -258,6 +292,10 @@ var DocService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListDocs",
 			Handler:    _DocService_ListDocs_Handler,
+		},
+		{
+			MethodName: "UpdateDoc",
+			Handler:    _DocService_UpdateDoc_Handler,
 		},
 		{
 			MethodName: "DeleteDoc",

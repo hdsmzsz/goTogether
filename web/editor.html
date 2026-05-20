@@ -18,6 +18,12 @@
         .ws-dot { width: 8px; height: 8px; border-radius: 50%; }
         .ws-connected { background: #22c55e; }
         .ws-disconnected { background: #ef4444; }
+        .btn-save { padding: 6px 16px; background: white; color: #2563eb; border: 1px solid white; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+        .btn-save:hover { background: #dbeafe; }
+        .btn-save:active { transform: scale(0.96); }
+        .btn-save.saving { opacity: 0.6; pointer-events: none; }
+        .btn-save.saved { background: #22c55e; color: white; border-color: #22c55e; }
+        .save-hint { color: rgba(255,255,255,0.7); font-size: 12px; }
     </style>
 </head>
 <body>
@@ -26,9 +32,13 @@
             <a href="/static/index.html">< Back</a>
             <h2 id="docTitle">Loading...</h2>
         </div>
-        <div class="ws-status">
-            <span class="ws-dot" id="wsDot"></span>
-            <span id="wsLabel">Connecting...</span>
+        <div style="display:flex;align-items:center;gap:12px;">
+            <button class="btn-save" id="saveBtn" onclick="saveDoc()">Save</button>
+            <span class="save-hint" id="saveHint">Cmd+S</span>
+            <div class="ws-status">
+                <span class="ws-dot" id="wsDot"></span>
+                <span id="wsLabel">Connecting...</span>
+            </div>
         </div>
     </div>
     <div class="status-bar">
@@ -97,6 +107,49 @@
                     }));
                 }
             }, 200);
+        });
+
+        async function saveDoc() {
+            const btn = document.getElementById('saveBtn');
+            const hint = document.getElementById('saveHint');
+            btn.className = 'btn-save saving';
+            btn.textContent = 'Saving...';
+            try {
+                const res = await fetch(API + '/docs/' + docId, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token,
+                    },
+                    body: JSON.stringify({ content: editor.textContent }),
+                });
+                if (res.ok) {
+                    btn.className = 'btn-save saved';
+                    btn.textContent = 'Saved';
+                    hint.textContent = '';
+                    setTimeout(() => {
+                        btn.className = 'btn-save';
+                        btn.textContent = 'Save';
+                        hint.textContent = 'Cmd+S';
+                    }, 2000);
+                } else {
+                    const data = await res.json();
+                    btn.className = 'btn-save';
+                    btn.textContent = 'Save';
+                    alert('Save failed: ' + (data.error || res.statusText));
+                }
+            } catch (e) {
+                btn.className = 'btn-save';
+                btn.textContent = 'Save';
+                alert('Save failed: ' + e.message);
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+                e.preventDefault();
+                saveDoc();
+            }
         });
 
         loadDoc();
