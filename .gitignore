@@ -8,3 +8,6 @@ vendor/
 .vscode/
 *.swp
 *.swo
+
+# benchmark binaries
+benchmark/collab_bench

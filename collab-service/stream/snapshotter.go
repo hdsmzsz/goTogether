@@ -14,7 +14,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
+
+var tracer = otel.Tracer("collab-service/snapshotter")
 
 const (
 	idleTimeout    = 5 * time.Second
@@ -112,10 +117,17 @@ func (s *Snapshotter) checkAndMerge(ctx context.Context) {
 }
 
 func (s *Snapshotter) mergeStream(ctx context.Context, streamKey, docID, trigger string) {
+	ctx, span := tracer.Start(ctx, "snapshot.merge", trace.WithAttributes(
+		attribute.String("doc_id", docID),
+		attribute.String("trigger", trigger),
+	))
+	defer span.End()
+
 	msgs, err := s.rdb.XRange(ctx, streamKey, "-", "+").Result()
 	if err != nil || len(msgs) == 0 {
 		return
 	}
+	span.SetAttributes(attribute.Int("updates_merged", len(msgs)))
 
 	lastPayload, ok := msgs[len(msgs)-1].Values["payload"].(string)
 	if !ok || lastPayload == "" {

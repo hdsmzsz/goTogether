@@ -15,6 +15,7 @@ import (
 	docpb "github.com/spike/goTogether/proto/doc"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -59,7 +60,7 @@ func main() {
 		defer pub.Close()
 	}
 
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 	docpb.RegisterDocServiceServer(srv, service.NewDocService(db, pub))
 
 	go func() {
