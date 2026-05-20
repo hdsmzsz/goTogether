@@ -1,10 +1,10 @@
 .PHONY: proto build run-all test docker-up docker-down clean
 
 proto:
-	protoc --go_out=. --go-grpc_out=. proto/user/user.proto
-	protoc --go_out=. --go-grpc_out=. proto/doc/doc.proto
-	protoc --go_out=. --go-grpc_out=. proto/collab/collab.proto
-	protoc --go_out=. --go-grpc_out=. proto/search/search.proto
+	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/user/user.proto
+	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/doc/doc.proto
+	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/collab/collab.proto
+	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative proto/search/search.proto
 
 build:
 	cd gateway && go build -o ../bin/gateway .

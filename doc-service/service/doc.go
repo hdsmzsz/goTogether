@@ -16,12 +16,13 @@ import (
 )
 
 type Document struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty"`
-	Title     string             `bson:"title"`
-	OwnerID   int64              `bson:"owner_id"`
-	Content   []byte             `bson:"content"`
-	CreatedAt time.Time          `bson:"created_at"`
-	UpdatedAt time.Time          `bson:"updated_at"`
+	ID            primitive.ObjectID `bson:"_id,omitempty"`
+	Title         string             `bson:"title"`
+	OwnerID       int64              `bson:"owner_id"`
+	Content       []byte             `bson:"content"`
+	Collaborators []int64            `bson:"collaborators,omitempty"`
+	CreatedAt     time.Time          `bson:"created_at"`
+	UpdatedAt     time.Time          `bson:"updated_at"`
 }
 
 type DocService struct {
@@ -79,17 +80,21 @@ func (s *DocService) GetDoc(ctx context.Context, req *docpb.GetDocRequest) (*doc
 		return nil, status.Errorf(codes.NotFound, "doc not found")
 	}
 	return &docpb.DocDetail{
-		DocId:     doc.ID.Hex(),
-		Title:     doc.Title,
-		OwnerId:   doc.OwnerID,
-		Content:   doc.Content,
-		CreatedAt: doc.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: doc.UpdatedAt.Format(time.RFC3339),
+		DocId:         doc.ID.Hex(),
+		Title:         doc.Title,
+		OwnerId:      doc.OwnerID,
+		Content:       doc.Content,
+		Collaborators: doc.Collaborators,
+		CreatedAt:     doc.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:     doc.UpdatedAt.Format(time.RFC3339),
 	}, nil
 }
 
 func (s *DocService) ListDocs(ctx context.Context, req *docpb.ListDocsRequest) (*docpb.ListDocsResponse, error) {
-	filter := bson.M{"owner_id": req.OwnerId}
+	filter := bson.M{"$or": bson.A{
+		bson.M{"owner_id": req.OwnerId},
+		bson.M{"collaborators": req.OwnerId},
+	}}
 	total, err := s.coll.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "count: %v", err)
@@ -159,6 +164,24 @@ func (s *DocService) DeleteDoc(ctx context.Context, req *docpb.DeleteDocRequest)
 		return nil, status.Errorf(codes.Internal, "delete: %v", err)
 	}
 	return &docpb.DeleteDocResponse{Success: result.DeletedCount > 0}, nil
+}
+
+func (s *DocService) ShareDoc(ctx context.Context, req *docpb.ShareDocRequest) (*docpb.ShareDocResponse, error) {
+	oid, err := primitive.ObjectIDFromHex(req.DocId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid doc_id")
+	}
+	result, err := s.coll.UpdateOne(ctx,
+		bson.M{"_id": oid, "owner_id": req.OwnerId},
+		bson.M{"$addToSet": bson.M{"collaborators": req.CollaboratorId}},
+	)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "share doc: %v", err)
+	}
+	if result.MatchedCount == 0 {
+		return nil, status.Errorf(codes.PermissionDenied, "not the document owner")
+	}
+	return &docpb.ShareDocResponse{Success: true}, nil
 }
 
 func (s *DocService) UploadImage(ctx context.Context, req *docpb.UploadImageRequest) (*docpb.UploadImageResponse, error) {

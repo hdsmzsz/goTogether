@@ -88,3 +88,18 @@ func (s *UserService) UpdateUser(ctx context.Context, req *userpb.UpdateUserRequ
 	}
 	return s.GetUser(ctx, &userpb.GetUserRequest{UserId: req.UserId})
 }
+
+func (s *UserService) LookupByUsername(ctx context.Context, req *userpb.LookupByUsernameRequest) (*userpb.UserInfo, error) {
+	var info userpb.UserInfo
+	var createdAt sql.NullTime
+	err := s.db.QueryRowContext(ctx,
+		"SELECT id, username, email, avatar_url, created_at FROM users WHERE username = $1", req.Username,
+	).Scan(&info.UserId, &info.Username, &info.Email, &info.AvatarUrl, &createdAt)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "user not found")
+	}
+	if createdAt.Valid {
+		info.CreatedAt = createdAt.Time.Format("2006-01-02T15:04:05Z")
+	}
+	return &info, nil
+}

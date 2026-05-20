@@ -25,6 +25,7 @@ const (
 	DocService_UpdateDoc_FullMethodName   = "/doc.DocService/UpdateDoc"
 	DocService_DeleteDoc_FullMethodName   = "/doc.DocService/DeleteDoc"
 	DocService_UploadImage_FullMethodName = "/doc.DocService/UploadImage"
+	DocService_ShareDoc_FullMethodName    = "/doc.DocService/ShareDoc"
 )
 
 // DocServiceClient is the client API for DocService service.
@@ -37,6 +38,7 @@ type DocServiceClient interface {
 	UpdateDoc(ctx context.Context, in *UpdateDocRequest, opts ...grpc.CallOption) (*DocDetail, error)
 	DeleteDoc(ctx context.Context, in *DeleteDocRequest, opts ...grpc.CallOption) (*DeleteDocResponse, error)
 	UploadImage(ctx context.Context, in *UploadImageRequest, opts ...grpc.CallOption) (*UploadImageResponse, error)
+	ShareDoc(ctx context.Context, in *ShareDocRequest, opts ...grpc.CallOption) (*ShareDocResponse, error)
 }
 
 type docServiceClient struct {
@@ -107,6 +109,16 @@ func (c *docServiceClient) UploadImage(ctx context.Context, in *UploadImageReque
 	return out, nil
 }
 
+func (c *docServiceClient) ShareDoc(ctx context.Context, in *ShareDocRequest, opts ...grpc.CallOption) (*ShareDocResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ShareDocResponse)
+	err := c.cc.Invoke(ctx, DocService_ShareDoc_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DocServiceServer is the server API for DocService service.
 // All implementations must embed UnimplementedDocServiceServer
 // for forward compatibility.
@@ -117,6 +129,7 @@ type DocServiceServer interface {
 	UpdateDoc(context.Context, *UpdateDocRequest) (*DocDetail, error)
 	DeleteDoc(context.Context, *DeleteDocRequest) (*DeleteDocResponse, error)
 	UploadImage(context.Context, *UploadImageRequest) (*UploadImageResponse, error)
+	ShareDoc(context.Context, *ShareDocRequest) (*ShareDocResponse, error)
 	mustEmbedUnimplementedDocServiceServer()
 }
 
@@ -144,6 +157,9 @@ func (UnimplementedDocServiceServer) DeleteDoc(context.Context, *DeleteDocReques
 }
 func (UnimplementedDocServiceServer) UploadImage(context.Context, *UploadImageRequest) (*UploadImageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UploadImage not implemented")
+}
+func (UnimplementedDocServiceServer) ShareDoc(context.Context, *ShareDocRequest) (*ShareDocResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ShareDoc not implemented")
 }
 func (UnimplementedDocServiceServer) mustEmbedUnimplementedDocServiceServer() {}
 func (UnimplementedDocServiceServer) testEmbeddedByValue()                    {}
@@ -274,6 +290,24 @@ func _DocService_UploadImage_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DocService_ShareDoc_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ShareDocRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DocServiceServer).ShareDoc(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DocService_ShareDoc_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DocServiceServer).ShareDoc(ctx, req.(*ShareDocRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DocService_ServiceDesc is the grpc.ServiceDesc for DocService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -304,6 +338,10 @@ var DocService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UploadImage",
 			Handler:    _DocService_UploadImage_Handler,
+		},
+		{
+			MethodName: "ShareDoc",
+			Handler:    _DocService_ShareDoc_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
