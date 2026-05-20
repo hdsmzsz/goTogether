@@ -37,10 +37,11 @@ type Hub struct {
 }
 
 type Message struct {
-	DocID   string `json:"doc_id"`
-	UserID  int64  `json:"user_id"`
-	Type    string `json:"type"` // "update", "awareness"
-	Payload []byte `json:"payload"`
+	DocID   string  `json:"doc_id"`
+	UserID  int64   `json:"user_id"`
+	Sender  *Client `json:"-"`
+	Type    string  `json:"type"` // "update", "awareness"
+	Payload []byte  `json:"payload"`
 }
 
 func NewHub(rdb *redis.Client, mongoDB *mongo.Database) *Hub {
@@ -84,7 +85,7 @@ func (h *Hub) Run() {
 			}
 			h.mu.RLock()
 			for client := range h.rooms[msg.DocID] {
-				if client.UserID == msg.UserID {
+				if client == msg.Sender {
 					continue
 				}
 				select {
@@ -156,6 +157,7 @@ func (h *Hub) readPump(c *Client) {
 		}
 		msg.DocID = c.DocID
 		msg.UserID = c.UserID
+		msg.Sender = c
 		h.broadcast <- &msg
 	}
 }

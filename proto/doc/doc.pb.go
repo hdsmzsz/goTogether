@@ -389,6 +389,74 @@ func (x *ListDocsResponse) GetTotal() int64 {
 	return 0
 }
 
+type UpdateDocRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DocId         string                 `protobuf:"bytes,1,opt,name=doc_id,json=docId,proto3" json:"doc_id,omitempty"`
+	UserId        int64                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Content       []byte                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateDocRequest) Reset() {
+	*x = UpdateDocRequest{}
+	mi := &file_proto_doc_doc_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateDocRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateDocRequest) ProtoMessage() {}
+
+func (x *UpdateDocRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_doc_doc_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateDocRequest.ProtoReflect.Descriptor instead.
+func (*UpdateDocRequest) Descriptor() ([]byte, []int) {
+	return file_proto_doc_doc_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *UpdateDocRequest) GetDocId() string {
+	if x != nil {
+		return x.DocId
+	}
+	return ""
+}
+
+func (x *UpdateDocRequest) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *UpdateDocRequest) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *UpdateDocRequest) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
 type DeleteDocRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DocId         string                 `protobuf:"bytes,1,opt,name=doc_id,json=docId,proto3" json:"doc_id,omitempty"`
@@ -399,7 +467,7 @@ type DeleteDocRequest struct {
 
 func (x *DeleteDocRequest) Reset() {
 	*x = DeleteDocRequest{}
-	mi := &file_proto_doc_doc_proto_msgTypes[6]
+	mi := &file_proto_doc_doc_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -411,7 +479,7 @@ func (x *DeleteDocRequest) String() string {
 func (*DeleteDocRequest) ProtoMessage() {}
 
 func (x *DeleteDocRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_doc_doc_proto_msgTypes[6]
+	mi := &file_proto_doc_doc_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -424,7 +492,7 @@ func (x *DeleteDocRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteDocRequest.ProtoReflect.Descriptor instead.
 func (*DeleteDocRequest) Descriptor() ([]byte, []int) {
-	return file_proto_doc_doc_proto_rawDescGZIP(), []int{6}
+	return file_proto_doc_doc_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DeleteDocRequest) GetDocId() string {
@@ -450,7 +518,7 @@ type DeleteDocResponse struct {
 
 func (x *DeleteDocResponse) Reset() {
 	*x = DeleteDocResponse{}
-	mi := &file_proto_doc_doc_proto_msgTypes[7]
+	mi := &file_proto_doc_doc_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -462,7 +530,7 @@ func (x *DeleteDocResponse) String() string {
 func (*DeleteDocResponse) ProtoMessage() {}
 
 func (x *DeleteDocResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_doc_doc_proto_msgTypes[7]
+	mi := &file_proto_doc_doc_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -475,7 +543,7 @@ func (x *DeleteDocResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteDocResponse.ProtoReflect.Descriptor instead.
 func (*DeleteDocResponse) Descriptor() ([]byte, []int) {
-	return file_proto_doc_doc_proto_rawDescGZIP(), []int{7}
+	return file_proto_doc_doc_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DeleteDocResponse) GetSuccess() bool {
@@ -497,7 +565,7 @@ type UploadImageRequest struct {
 
 func (x *UploadImageRequest) Reset() {
 	*x = UploadImageRequest{}
-	mi := &file_proto_doc_doc_proto_msgTypes[8]
+	mi := &file_proto_doc_doc_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -509,7 +577,7 @@ func (x *UploadImageRequest) String() string {
 func (*UploadImageRequest) ProtoMessage() {}
 
 func (x *UploadImageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_doc_doc_proto_msgTypes[8]
+	mi := &file_proto_doc_doc_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -522,7 +590,7 @@ func (x *UploadImageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadImageRequest.ProtoReflect.Descriptor instead.
 func (*UploadImageRequest) Descriptor() ([]byte, []int) {
-	return file_proto_doc_doc_proto_rawDescGZIP(), []int{8}
+	return file_proto_doc_doc_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UploadImageRequest) GetDocId() string {
@@ -562,7 +630,7 @@ type UploadImageResponse struct {
 
 func (x *UploadImageResponse) Reset() {
 	*x = UploadImageResponse{}
-	mi := &file_proto_doc_doc_proto_msgTypes[9]
+	mi := &file_proto_doc_doc_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -574,7 +642,7 @@ func (x *UploadImageResponse) String() string {
 func (*UploadImageResponse) ProtoMessage() {}
 
 func (x *UploadImageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_doc_doc_proto_msgTypes[9]
+	mi := &file_proto_doc_doc_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -587,7 +655,7 @@ func (x *UploadImageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadImageResponse.ProtoReflect.Descriptor instead.
 func (*UploadImageResponse) Descriptor() ([]byte, []int) {
-	return file_proto_doc_doc_proto_rawDescGZIP(), []int{9}
+	return file_proto_doc_doc_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UploadImageResponse) GetUrl() string {
@@ -630,7 +698,12 @@ const file_proto_doc_doc_proto_rawDesc = "" +
 	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\"J\n" +
 	"\x10ListDocsResponse\x12 \n" +
 	"\x04docs\x18\x01 \x03(\v2\f.doc.DocInfoR\x04docs\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x03R\x05total\"B\n" +
+	"\x05total\x18\x02 \x01(\x03R\x05total\"r\n" +
+	"\x10UpdateDocRequest\x12\x15\n" +
+	"\x06doc_id\x18\x01 \x01(\tR\x05docId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x18\n" +
+	"\acontent\x18\x04 \x01(\fR\acontent\"B\n" +
 	"\x10DeleteDocRequest\x12\x15\n" +
 	"\x06doc_id\x18\x01 \x01(\tR\x05docId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\"-\n" +
@@ -642,12 +715,13 @@ const file_proto_doc_doc_proto_rawDesc = "" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12!\n" +
 	"\fcontent_type\x18\x04 \x01(\tR\vcontentType\"'\n" +
 	"\x13UploadImageResponse\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url2\xa3\x02\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url2\xd7\x02\n" +
 	"\n" +
 	"DocService\x120\n" +
 	"\tCreateDoc\x12\x15.doc.CreateDocRequest\x1a\f.doc.DocInfo\x12,\n" +
 	"\x06GetDoc\x12\x12.doc.GetDocRequest\x1a\x0e.doc.DocDetail\x127\n" +
-	"\bListDocs\x12\x14.doc.ListDocsRequest\x1a\x15.doc.ListDocsResponse\x12:\n" +
+	"\bListDocs\x12\x14.doc.ListDocsRequest\x1a\x15.doc.ListDocsResponse\x122\n" +
+	"\tUpdateDoc\x12\x15.doc.UpdateDocRequest\x1a\x0e.doc.DocDetail\x12:\n" +
 	"\tDeleteDoc\x12\x15.doc.DeleteDocRequest\x1a\x16.doc.DeleteDocResponse\x12@\n" +
 	"\vUploadImage\x12\x17.doc.UploadImageRequest\x1a\x18.doc.UploadImageResponseB'Z%github.com/spike/goTogether/proto/docb\x06proto3"
 
@@ -663,7 +737,7 @@ func file_proto_doc_doc_proto_rawDescGZIP() []byte {
 	return file_proto_doc_doc_proto_rawDescData
 }
 
-var file_proto_doc_doc_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_proto_doc_doc_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_proto_doc_doc_proto_goTypes = []any{
 	(*CreateDocRequest)(nil),    // 0: doc.CreateDocRequest
 	(*DocInfo)(nil),             // 1: doc.DocInfo
@@ -671,28 +745,31 @@ var file_proto_doc_doc_proto_goTypes = []any{
 	(*DocDetail)(nil),           // 3: doc.DocDetail
 	(*ListDocsRequest)(nil),     // 4: doc.ListDocsRequest
 	(*ListDocsResponse)(nil),    // 5: doc.ListDocsResponse
-	(*DeleteDocRequest)(nil),    // 6: doc.DeleteDocRequest
-	(*DeleteDocResponse)(nil),   // 7: doc.DeleteDocResponse
-	(*UploadImageRequest)(nil),  // 8: doc.UploadImageRequest
-	(*UploadImageResponse)(nil), // 9: doc.UploadImageResponse
+	(*UpdateDocRequest)(nil),    // 6: doc.UpdateDocRequest
+	(*DeleteDocRequest)(nil),    // 7: doc.DeleteDocRequest
+	(*DeleteDocResponse)(nil),   // 8: doc.DeleteDocResponse
+	(*UploadImageRequest)(nil),  // 9: doc.UploadImageRequest
+	(*UploadImageResponse)(nil), // 10: doc.UploadImageResponse
 }
 var file_proto_doc_doc_proto_depIdxs = []int32{
-	1, // 0: doc.ListDocsResponse.docs:type_name -> doc.DocInfo
-	0, // 1: doc.DocService.CreateDoc:input_type -> doc.CreateDocRequest
-	2, // 2: doc.DocService.GetDoc:input_type -> doc.GetDocRequest
-	4, // 3: doc.DocService.ListDocs:input_type -> doc.ListDocsRequest
-	6, // 4: doc.DocService.DeleteDoc:input_type -> doc.DeleteDocRequest
-	8, // 5: doc.DocService.UploadImage:input_type -> doc.UploadImageRequest
-	1, // 6: doc.DocService.CreateDoc:output_type -> doc.DocInfo
-	3, // 7: doc.DocService.GetDoc:output_type -> doc.DocDetail
-	5, // 8: doc.DocService.ListDocs:output_type -> doc.ListDocsResponse
-	7, // 9: doc.DocService.DeleteDoc:output_type -> doc.DeleteDocResponse
-	9, // 10: doc.DocService.UploadImage:output_type -> doc.UploadImageResponse
-	6, // [6:11] is the sub-list for method output_type
-	1, // [1:6] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1,  // 0: doc.ListDocsResponse.docs:type_name -> doc.DocInfo
+	0,  // 1: doc.DocService.CreateDoc:input_type -> doc.CreateDocRequest
+	2,  // 2: doc.DocService.GetDoc:input_type -> doc.GetDocRequest
+	4,  // 3: doc.DocService.ListDocs:input_type -> doc.ListDocsRequest
+	6,  // 4: doc.DocService.UpdateDoc:input_type -> doc.UpdateDocRequest
+	7,  // 5: doc.DocService.DeleteDoc:input_type -> doc.DeleteDocRequest
+	9,  // 6: doc.DocService.UploadImage:input_type -> doc.UploadImageRequest
+	1,  // 7: doc.DocService.CreateDoc:output_type -> doc.DocInfo
+	3,  // 8: doc.DocService.GetDoc:output_type -> doc.DocDetail
+	5,  // 9: doc.DocService.ListDocs:output_type -> doc.ListDocsResponse
+	3,  // 10: doc.DocService.UpdateDoc:output_type -> doc.DocDetail
+	8,  // 11: doc.DocService.DeleteDoc:output_type -> doc.DeleteDocResponse
+	10, // 12: doc.DocService.UploadImage:output_type -> doc.UploadImageResponse
+	7,  // [7:13] is the sub-list for method output_type
+	1,  // [1:7] is the sub-list for method input_type
+	1,  // [1:1] is the sub-list for extension type_name
+	1,  // [1:1] is the sub-list for extension extendee
+	0,  // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_proto_doc_doc_proto_init() }
@@ -706,7 +783,7 @@ func file_proto_doc_doc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_doc_doc_proto_rawDesc), len(file_proto_doc_doc_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

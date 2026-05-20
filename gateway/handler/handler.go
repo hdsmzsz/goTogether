@@ -155,6 +155,42 @@ func (h *Handler) CreateDoc(c *gin.Context) {
 	c.JSON(http.StatusOK, doc)
 }
 
+func (h *Handler) SaveDoc(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	docID := c.Param("id")
+	var req struct {
+		Title   string `json:"title"`
+		Content string `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	conn, err := h.dialService("doc-service", "DOC_SERVICE_ADDR", "doc-service:9002")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "service unavailable"})
+		return
+	}
+	defer conn.Close()
+
+	client := docpb.NewDocServiceClient(conn)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	doc, err := client.UpdateDoc(ctx, &docpb.UpdateDocRequest{
+		DocId:   docID,
+		UserId:  userID,
+		Title:   req.Title,
+		Content: []byte(req.Content),
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, doc)
+}
+
 func (h *Handler) GetDoc(c *gin.Context) {
 	docID := c.Param("id")
 	conn, err := h.dialService("doc-service", "DOC_SERVICE_ADDR", "doc-service:9002")

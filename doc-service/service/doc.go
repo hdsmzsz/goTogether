@@ -105,6 +105,23 @@ func (s *DocService) ListDocs(ctx context.Context, req *docpb.ListDocsRequest) (
 	return &docpb.ListDocsResponse{Docs: docs, Total: total}, nil
 }
 
+func (s *DocService) UpdateDoc(ctx context.Context, req *docpb.UpdateDocRequest) (*docpb.DocDetail, error) {
+	oid, err := primitive.ObjectIDFromHex(req.DocId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid doc_id")
+	}
+	now := time.Now()
+	update := bson.M{"$set": bson.M{"content": req.Content, "updated_at": now}}
+	if req.Title != "" {
+		update["$set"].(bson.M)["title"] = req.Title
+	}
+	_, err = s.coll.UpdateOne(ctx, bson.M{"_id": oid}, update)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "update doc: %v", err)
+	}
+	return s.GetDoc(ctx, &docpb.GetDocRequest{DocId: req.DocId})
+}
+
 func (s *DocService) DeleteDoc(ctx context.Context, req *docpb.DeleteDocRequest) (*docpb.DeleteDocResponse, error) {
 	oid, err := primitive.ObjectIDFromHex(req.DocId)
 	if err != nil {
