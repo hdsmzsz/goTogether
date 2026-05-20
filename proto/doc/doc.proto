@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package doc;
+option go_package = "github.com/spike/goTogether/proto/doc";
+
+service DocService {
+  rpc CreateDoc(CreateDocRequest) returns (DocInfo);
+  rpc GetDoc(GetDocRequest) returns (DocDetail);
+  rpc ListDocs(ListDocsRequest) returns (ListDocsResponse);
+  rpc DeleteDoc(DeleteDocRequest) returns (DeleteDocResponse);
+  rpc UploadImage(UploadImageRequest) returns (UploadImageResponse);
+}
+
+message CreateDocRequest {
+  int64 owner_id = 1;
+  string title = 2;
+}
+
+message DocInfo {
+  string doc_id = 1;
+  string title = 2;
+  int64 owner_id = 3;
+  string created_at = 4;
+  string updated_at = 5;
+}
+
+message GetDocRequest {
+  string doc_id = 1;
+}
+
+message DocDetail {
+  string doc_id = 1;
+  string title = 2;
+  int64 owner_id = 3;
+  bytes content = 4;
+  string created_at = 5;
+  string updated_at = 6;
+}
+
+message ListDocsRequest {
+  int64 owner_id = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+}
+
+message ListDocsResponse {
+  repeated DocInfo docs = 1;
+  int64 total = 2;
+}
+
+message DeleteDocRequest {
+  string doc_id = 1;
+  int64 user_id = 2;
+}
+
+message DeleteDocResponse {
+  bool success = 1;
+}
+
+message UploadImageRequest {
+  string doc_id = 1;
+  string filename = 2;
+  bytes data = 3;
+  string content_type = 4;
+}
+
+message UploadImageResponse {
+  string url = 1;
+}

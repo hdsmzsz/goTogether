@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>goTogether Editor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; }
+        .toolbar { background: #2563eb; color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .toolbar a { color: white; text-decoration: none; font-size: 14px; }
+        .toolbar h2 { font-size: 18px; }
+        .status-bar { background: #e2e8f0; padding: 8px 24px; display: flex; gap: 16px; font-size: 13px; color: #64748b; }
+        .collaborators { display: flex; gap: 4px; }
+        .avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold; }
+        #editor { max-width: 800px; margin: 24px auto; min-height: 600px; background: white; padding: 48px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); outline: none; font-size: 16px; line-height: 1.8; white-space: pre-wrap; }
+        .ws-status { display: inline-flex; align-items: center; gap: 4px; }
+        .ws-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .ws-connected { background: #22c55e; }
+        .ws-disconnected { background: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <div style="display:flex;align-items:center;gap:16px;">
+            <a href="/static/index.html">< Back</a>
+            <h2 id="docTitle">Loading...</h2>
+        </div>
+        <div class="ws-status">
+            <span class="ws-dot" id="wsDot"></span>
+            <span id="wsLabel">Connecting...</span>
+        </div>
+    </div>
+    <div class="status-bar">
+        <span>Collaborators:</span>
+        <div id="collaborators" class="collaborators"></div>
+    </div>
+    <div id="editor" contenteditable="true" placeholder="Start typing..."></div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const docId = params.get('id');
+        const token = localStorage.getItem('token');
+        const API = window.location.origin + '/api/v1';
+        const WS_URL = 'ws://' + window.location.hostname + ':8082/ws?doc_id=' + docId;
+
+        let ws;
+
+        async function loadDoc() {
+            try {
+                const res = await fetch(API + '/docs/' + docId, {
+                    headers: { 'Authorization': 'Bearer ' + token },
+                });
+                const doc = await res.json();
+                document.getElementById('docTitle').textContent = doc.title || 'Untitled';
+                if (doc.content) {
+                    document.getElementById('editor').textContent = atob(doc.content);
+                }
+            } catch (e) {
+                console.error('load doc:', e);
+            }
+        }
+
+        function connectWS() {
+            ws = new WebSocket(WS_URL);
+            ws.onopen = () => {
+                document.getElementById('wsDot').className = 'ws-dot ws-connected';
+                document.getElementById('wsLabel').textContent = 'Connected';
+            };
+            ws.onclose = () => {
+                document.getElementById('wsDot').className = 'ws-dot ws-disconnected';
+                document.getElementById('wsLabel').textContent = 'Disconnected';
+                setTimeout(connectWS, 3000);
+            };
+            ws.onmessage = (e) => {
+                try {
+                    const msg = JSON.parse(e.data);
+                    if (msg.type === 'update') {
+                        // In production, Yjs would merge CRDT updates here
+                        console.log('received update from peer');
+                    }
+                } catch (err) {
+                    console.log('ws message:', e.data);
+                }
+            };
+        }
+
+        const editor = document.getElementById('editor');
+        let debounceTimer;
+        editor.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'update',
+                        payload: btoa(editor.textContent),
+                    }));
+                }
+            }, 200);
+        });
+
+        loadDoc();
+        connectWS();
+    </script>
+</body>
+</html>

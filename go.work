@@ -1,0 +1,11 @@
+go 1.25.0
+
+use (
+	./collab-service
+	./doc-service
+	./gateway
+	./pkg
+	./proto
+	./search-service
+	./user-service
+)

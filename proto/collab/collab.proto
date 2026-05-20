@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package collab;
+option go_package = "github.com/spike/goTogether/proto/collab";
+
+service CollabService {
+  rpc GetDocState(GetDocStateRequest) returns (DocState);
+  rpc GetCollaborators(GetCollaboratorsRequest) returns (CollaboratorsResponse);
+}
+
+message GetDocStateRequest {
+  string doc_id = 1;
+}
+
+message DocState {
+  string doc_id = 1;
+  bytes snapshot = 2;
+  uint64 version = 3;
+}
+
+message GetCollaboratorsRequest {
+  string doc_id = 1;
+}
+
+message CollaboratorsResponse {
+  repeated Collaborator collaborators = 1;
+}
+
+message Collaborator {
+  int64 user_id = 1;
+  string username = 2;
+  string color = 3;
+}

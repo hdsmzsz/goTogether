@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package search;
+option go_package = "github.com/spike/goTogether/proto/search";
+
+service SearchService {
+  rpc SearchDocs(SearchRequest) returns (SearchResponse);
+  rpc ReindexDoc(ReindexRequest) returns (ReindexResponse);
+}
+
+message SearchRequest {
+  string query = 1;
+  int64 user_id = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+message SearchResponse {
+  repeated SearchHit hits = 1;
+  int64 total = 2;
+}
+
+message SearchHit {
+  string doc_id = 1;
+  string title = 2;
+  string highlight = 3;
+  float score = 4;
+  string updated_at = 5;
+}
+
+message ReindexRequest {
+  string doc_id = 1;
+}
+
+message ReindexResponse {
+  bool success = 1;
+}

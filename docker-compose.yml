@@ -1,0 +1,201 @@
+services:
+  # ===== Infrastructure =====
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: gotogether
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  etcd:
+    image: bitnami/etcd:3.5
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
+    ports:
+      - "2379:2379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms256m -Xmx256m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9090"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    volumes:
+      - minio_data:/data
+
+  # ===== Observability =====
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+
+  # ===== Application Services =====
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      GATEWAY_PORT: "8080"
+      USER_SERVICE_ADDR: "user-service:9001"
+      DOC_SERVICE_ADDR: "doc-service:9002"
+      SEARCH_SERVICE_ADDR: "search-service:9004"
+      ETCD_ENDPOINTS: "etcd:2379"
+      JWT_SECRET: "go-together-dev-secret"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4318"
+    depends_on:
+      etcd:
+        condition: service_started
+      user-service:
+        condition: service_started
+      doc-service:
+        condition: service_started
+
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    environment:
+      USER_SERVICE_PORT: "9001"
+      POSTGRES_DSN: "postgres://postgres:postgres@postgres:5432/gotogether?sslmode=disable"
+      ETCD_ENDPOINTS: "etcd:2379"
+      JWT_SECRET: "go-together-dev-secret"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4318"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      etcd:
+        condition: service_started
+
+  doc-service:
+    build:
+      context: .
+      dockerfile: doc-service/Dockerfile
+    environment:
+      DOC_SERVICE_PORT: "9002"
+      MONGO_URI: "mongodb://mongodb:27017"
+      ETCD_ENDPOINTS: "etcd:2379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4318"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      etcd:
+        condition: service_started
+
+  collab-service:
+    build:
+      context: .
+      dockerfile: collab-service/Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      COLLAB_WS_PORT: "8082"
+      COLLAB_GRPC_PORT: "9003"
+      REDIS_ADDR: "redis:6379"
+      MONGO_URI: "mongodb://mongodb:27017"
+      ETCD_ENDPOINTS: "etcd:2379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4318"
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      etcd:
+        condition: service_started
+
+  search-service:
+    build:
+      context: .
+      dockerfile: search-service/Dockerfile
+    environment:
+      SEARCH_SERVICE_PORT: "9004"
+      ES_ADDRESSES: "http://elasticsearch:9200"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+      ETCD_ENDPOINTS: "etcd:2379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4318"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      etcd:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  mongo_data:
+  es_data:
+  minio_data:
