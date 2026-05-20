@@ -39,10 +39,11 @@ services:
       retries: 5
 
   etcd:
-    image: bitnami/etcd:3.5
-    environment:
-      ALLOW_NONE_AUTHENTICATION: "yes"
-      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
+    image: gcr.io/etcd-development/etcd:v3.5.17
+    command:
+      - etcd
+      - --advertise-client-urls=http://0.0.0.0:2379
+      - --listen-client-urls=http://0.0.0.0:2379
     ports:
       - "2379:2379"
 
@@ -107,7 +108,7 @@ services:
       context: .
       dockerfile: gateway/Dockerfile
     ports:
-      - "8080:8080"
+      - "8088:8080"
     environment:
       GATEWAY_PORT: "8080"
       USER_SERVICE_ADDR: "user-service:9001"

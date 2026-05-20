@@ -1,9 +1,9 @@
 FROM golang:1.25-alpine AS builder
 WORKDIR /app
-COPY go.work go.work
 COPY pkg/ pkg/
 COPY proto/ proto/
 COPY gateway/ gateway/
+ENV GOWORK=off
 RUN cd gateway && go mod download
 RUN cd gateway && CGO_ENABLED=0 go build -o /gateway .
 

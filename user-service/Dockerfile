@@ -1,9 +1,9 @@
 FROM golang:1.25-alpine AS builder
 WORKDIR /app
-COPY go.work go.work
 COPY pkg/ pkg/
 COPY proto/ proto/
 COPY user-service/ user-service/
+ENV GOWORK=off
 RUN cd user-service && go mod download
 RUN cd user-service && CGO_ENABLED=0 go build -o /user-service .
 
