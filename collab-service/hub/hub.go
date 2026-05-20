@@ -12,6 +12,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -85,6 +87,7 @@ func (h *Hub) Run() {
 			wsRooms.Set(float64(len(h.rooms)))
 			h.mu.Unlock()
 			log.Printf("client joined doc=%s user=%d", client.DocID, client.UserID)
+			go h.sendSync(client)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -105,13 +108,22 @@ func (h *Hub) Run() {
 			if msg.Type == "update" {
 				h.appendToStream(msg)
 			}
+			outbound, err := json.Marshal(map[string]interface{}{
+				"type":    msg.Type,
+				"user_id": msg.UserID,
+				"payload": msg.Payload,
+			})
+			if err != nil {
+				log.Printf("marshal broadcast: %v", err)
+				continue
+			}
 			h.mu.RLock()
 			for client := range h.rooms[msg.DocID] {
 				if client == msg.Sender {
 					continue
 				}
 				select {
-				case client.Send <- msg.Payload:
+				case client.Send <- outbound:
 				default:
 					go func(c *Client) { h.unregister <- c }(client)
 				}
@@ -205,6 +217,45 @@ func (h *Hub) writePump(c *Client) {
 				return
 			}
 		}
+	}
+}
+
+func (h *Hub) sendSync(c *Client) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	var content []byte
+
+	streamKey := "doc:updates:" + c.DocID
+	msgs, err := h.rdb.XRevRangeN(ctx, streamKey, "+", "-", 1).Result()
+	if err == nil && len(msgs) > 0 {
+		if payload, ok := msgs[0].Values["payload"].(string); ok {
+			content = []byte(payload)
+		}
+	}
+
+	if content == nil {
+		oid, err := primitive.ObjectIDFromHex(c.DocID)
+		if err != nil {
+			return
+		}
+		var doc struct {
+			Content []byte `bson:"content"`
+		}
+		err = h.mongoDB.Collection("documents").FindOne(ctx, bson.M{"_id": oid}).Decode(&doc)
+		if err != nil || len(doc.Content) == 0 {
+			return
+		}
+		content = doc.Content
+	}
+
+	msg, _ := json.Marshal(map[string]interface{}{
+		"type":    "sync",
+		"payload": content,
+	})
+	select {
+	case c.Send <- msg:
+	default:
 	}
 }
 

@@ -3,12 +3,20 @@ package stream
 import (
 	"context"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+const (
+	idleTimeout    = 5 * time.Second
+	fallbackTimeout = 30 * time.Second
+	checkInterval  = 1 * time.Second
 )
 
 type Snapshotter struct {
@@ -21,7 +29,7 @@ func NewSnapshotter(rdb *redis.Client, mongoDB *mongo.Database) *Snapshotter {
 }
 
 func (s *Snapshotter) Start(ctx context.Context) {
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(checkInterval)
 	defer ticker.Stop()
 
 	for {
@@ -29,60 +37,87 @@ func (s *Snapshotter) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.mergeAllStreams(ctx)
+			s.checkAndMerge(ctx)
 		}
 	}
 }
 
-func (s *Snapshotter) mergeAllStreams(ctx context.Context) {
-	// Scan all doc:updates:* streams
+func (s *Snapshotter) checkAndMerge(ctx context.Context) {
 	iter := s.rdb.Scan(ctx, 0, "doc:updates:*", 100).Iterator()
 	for iter.Next(ctx) {
 		streamKey := iter.Val()
 		docID := streamKey[len("doc:updates:"):]
-		s.mergeStream(ctx, streamKey, docID)
+
+		oldest, err := s.rdb.XRangeN(ctx, streamKey, "-", "+", 1).Result()
+		if err != nil || len(oldest) == 0 {
+			continue
+		}
+		latest, err := s.rdb.XRevRangeN(ctx, streamKey, "+", "-", 1).Result()
+		if err != nil || len(latest) == 0 {
+			continue
+		}
+
+		now := time.Now()
+		latestTime := parseStreamTime(latest[0].ID)
+		oldestTime := parseStreamTime(oldest[0].ID)
+
+		idle := now.Sub(latestTime) >= idleTimeout
+		fallback := now.Sub(oldestTime) >= fallbackTimeout
+
+		if idle || fallback {
+			trigger := "idle"
+			if fallback && !idle {
+				trigger = "fallback"
+			}
+			s.mergeStream(ctx, streamKey, docID, trigger)
+		}
 	}
 }
 
-func (s *Snapshotter) mergeStream(ctx context.Context, streamKey, docID string) {
+func (s *Snapshotter) mergeStream(ctx context.Context, streamKey, docID, trigger string) {
 	msgs, err := s.rdb.XRange(ctx, streamKey, "-", "+").Result()
 	if err != nil || len(msgs) == 0 {
 		return
 	}
 
-	// Collect all update payloads
-	var updates [][]byte
-	var lastID string
-	for _, msg := range msgs {
-		if payload, ok := msg.Values["payload"].(string); ok {
-			updates = append(updates, []byte(payload))
-		}
-		lastID = msg.ID
-	}
-
-	if len(updates) == 0 {
+	lastPayload, ok := msgs[len(msgs)-1].Values["payload"].(string)
+	if !ok || lastPayload == "" {
 		return
 	}
 
-	// Store merged snapshot to MongoDB
-	coll := s.mongoDB.Collection("snapshots")
+	oid, err := primitive.ObjectIDFromHex(docID)
+	if err != nil {
+		log.Printf("snapshot: invalid doc_id %s: %v", docID, err)
+		return
+	}
+
+	coll := s.mongoDB.Collection("documents")
 	_, err = coll.UpdateOne(ctx,
-		bson.M{"doc_id": docID},
-		bson.M{
-			"$set": bson.M{
-				"doc_id":     docID,
-				"updates":    updates,
-				"updated_at": time.Now(),
-			},
-		},
-		options.Update().SetUpsert(true),
+		bson.M{"_id": oid},
+		bson.M{"$set": bson.M{
+			"content":    []byte(lastPayload),
+			"updated_at": time.Now(),
+		}},
 	)
 	if err != nil {
-		log.Printf("snapshot merge failed for %s: %v", docID, err)
+		log.Printf("snapshot: writeback doc=%s failed: %v", docID, err)
 		return
 	}
 
-	// Trim processed entries from stream
-	s.rdb.XTrimMinID(ctx, streamKey, lastID)
-	log.Printf("snapshot merged for doc=%s, %d updates", docID, len(updates))
+	ids := make([]string, len(msgs))
+	for i, msg := range msgs {
+		ids[i] = msg.ID
+	}
+	s.rdb.XDel(ctx, streamKey, ids...)
+
+	log.Printf("snapshot: doc=%s merged %d updates (%s trigger)", docID, len(msgs), trigger)
+}
+
+func parseStreamTime(id string) time.Time {
+	parts := strings.SplitN(id, "-", 2)
+	ms, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return time.Time{}
+	}
+	return time.UnixMilli(ms)
 }
