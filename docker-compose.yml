@@ -152,6 +152,11 @@ services:
       REDIS_ADDR: "redis:6379"
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       ETCD_ENDPOINTS: "etcd:2379"
+      MINIO_ENDPOINT: "minio:9000"
+      MINIO_ROOT_USER: "minioadmin"
+      MINIO_ROOT_PASSWORD: "minioadmin"
+      MINIO_BUCKET: "gotogether-images"
+      MINIO_PUBLIC_HOST: "http://localhost:9000"
       OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4318"
     depends_on:
       mongodb:
@@ -161,6 +166,8 @@ services:
       rabbitmq:
         condition: service_healthy
       etcd:
+        condition: service_started
+      minio:
         condition: service_started
 
   collab-service:

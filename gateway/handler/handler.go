@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -267,6 +268,53 @@ func (h *Handler) SearchDocs(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) UploadImage(c *gin.Context) {
+	docID := c.Param("id")
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing file field"})
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if len(data) > 10*1024*1024 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file too large (max 10MB)"})
+		return
+	}
+
+	conn, err := h.dialService("doc-service", "DOC_SERVICE_ADDR", "doc-service:9002")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "service unavailable"})
+		return
+	}
+	defer conn.Close()
+
+	client := docpb.NewDocServiceClient(conn)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	resp, err := client.UploadImage(ctx, &docpb.UploadImageRequest{
+		DocId:       docID,
+		Filename:    header.Filename,
+		Data:        data,
+		ContentType: contentType,
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"url": resp.Url})
 }
 
 func (h *Handler) ShareDoc(c *gin.Context) {
