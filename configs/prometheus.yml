@@ -8,3 +8,6 @@ scrape_configs:
   - job_name: 'collab-service'
     static_configs:
       - targets: ['collab-service:8082']
+  - job_name: 'doc-service'
+    static_configs:
+      - targets: ['doc-service:9102']
