@@ -83,6 +83,7 @@
         const WS_URL = 'ws://' + window.location.hostname + ':8082/ws?doc_id=' + docId;
 
         let ws;
+        let isRemoteUpdate = false;
 
         async function loadDoc() {
             try {
@@ -113,9 +114,24 @@
             ws.onmessage = (e) => {
                 try {
                     const msg = JSON.parse(e.data);
-                    if (msg.type === 'update') {
-                        // In production, Yjs would merge CRDT updates here
-                        console.log('received update from peer');
+                    if ((msg.type === 'update' || msg.type === 'sync') && msg.payload) {
+                        const text = atob(msg.payload);
+                        const sel = window.getSelection();
+                        const cursorOffset = sel.rangeCount ? sel.getRangeAt(0).startOffset : 0;
+                        isRemoteUpdate = true;
+                        editor.textContent = text;
+                        isRemoteUpdate = false;
+                        // Restore cursor position
+                        try {
+                            if (editor.firstChild) {
+                                const range = document.createRange();
+                                const pos = Math.min(cursorOffset, editor.firstChild.length);
+                                range.setStart(editor.firstChild, pos);
+                                range.collapse(true);
+                                sel.removeAllRanges();
+                                sel.addRange(range);
+                            }
+                        } catch (ex) {}
                     }
                 } catch (err) {
                     console.log('ws message:', e.data);
@@ -126,6 +142,7 @@
         const editor = document.getElementById('editor');
         let debounceTimer;
         editor.addEventListener('input', () => {
+            if (isRemoteUpdate) return;
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
@@ -226,8 +243,7 @@
             if (e.target === document.getElementById('shareModal')) closeShareModal();
         });
 
-        loadDoc();
-        connectWS();
+        loadDoc().then(() => connectWS());
     </script>
 </body>
 </html>
