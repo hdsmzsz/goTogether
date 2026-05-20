@@ -3,6 +3,7 @@ module github.com/spike/goTogether/doc-service
 go 1.25.0
 
 require (
+	github.com/rabbitmq/amqp091-go v1.11.0
 	github.com/spike/goTogether/pkg v0.0.0
 	github.com/spike/goTogether/proto v0.0.0
 	go.mongodb.org/mongo-driver v1.17.2

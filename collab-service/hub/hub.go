@@ -9,8 +9,25 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
+)
+
+var (
+	wsConnections = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "ws_active_connections",
+		Help: "Number of active WebSocket connections",
+	})
+	wsMsgSent = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "ws_messages_broadcast_total",
+		Help: "Total WebSocket messages broadcast",
+	})
+	wsRooms = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "ws_active_rooms",
+		Help: "Number of active document rooms",
+	})
 )
 
 var upgrader = websocket.Upgrader{
@@ -64,6 +81,8 @@ func (h *Hub) Run() {
 				h.rooms[client.DocID] = make(map[*Client]bool)
 			}
 			h.rooms[client.DocID][client] = true
+			wsConnections.Inc()
+			wsRooms.Set(float64(len(h.rooms)))
 			h.mu.Unlock()
 			log.Printf("client joined doc=%s user=%d", client.DocID, client.UserID)
 
@@ -76,10 +95,13 @@ func (h *Hub) Run() {
 				}
 			}
 			close(client.Send)
+			wsConnections.Dec()
+			wsRooms.Set(float64(len(h.rooms)))
 			h.mu.Unlock()
 			log.Printf("client left doc=%s user=%d", client.DocID, client.UserID)
 
 		case msg := <-h.broadcast:
+			wsMsgSent.Inc()
 			if msg.Type == "update" {
 				h.appendToStream(msg)
 			}

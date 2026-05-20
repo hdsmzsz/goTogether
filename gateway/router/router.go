@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spike/goTogether/gateway/handler"
 	"github.com/spike/goTogether/pkg/middleware"
 )
@@ -12,7 +13,9 @@ func Setup(h *handler.Handler) *gin.Engine {
 	r := gin.Default()
 
 	r.Use(cors())
+	r.Use(middleware.PrometheusMetrics())
 
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	r.Static("/static", "./web")
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
