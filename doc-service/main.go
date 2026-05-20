@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/spike/goTogether/doc-service/mq"
 	"github.com/spike/goTogether/doc-service/service"
 	"github.com/spike/goTogether/pkg/discovery"
 	"github.com/spike/goTogether/pkg/tracing"
@@ -51,8 +52,15 @@ func main() {
 		registry.Register(context.Background(), "doc-service", "doc-service:"+port)
 	}
 
+	pub, err := mq.NewPublisher()
+	if err != nil {
+		log.Printf("rabbitmq publisher init failed (search indexing disabled): %v", err)
+	} else {
+		defer pub.Close()
+	}
+
 	srv := grpc.NewServer()
-	docpb.RegisterDocServiceServer(srv, service.NewDocService(db))
+	docpb.RegisterDocServiceServer(srv, service.NewDocService(db, pub))
 
 	go func() {
 		log.Printf("doc-service listening on :%s", port)

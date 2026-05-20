@@ -148,10 +148,13 @@ services:
     environment:
       DOC_SERVICE_PORT: "9002"
       MONGO_URI: "mongodb://mongodb:27017"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       ETCD_ENDPOINTS: "etcd:2379"
       OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4318"
     depends_on:
       mongodb:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       etcd:
         condition: service_started

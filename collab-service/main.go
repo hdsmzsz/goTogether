@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/spike/goTogether/collab-service/hub"
 	"github.com/spike/goTogether/collab-service/service"
@@ -60,6 +61,7 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", h.HandleWebSocket)
+	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})

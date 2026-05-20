@@ -2,8 +2,10 @@ package service
 
 import (
 	"context"
+	"log"
 	"time"
 
+	"github.com/spike/goTogether/doc-service/mq"
 	docpb "github.com/spike/goTogether/proto/doc"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -25,10 +27,11 @@ type Document struct {
 type DocService struct {
 	docpb.UnimplementedDocServiceServer
 	coll *mongo.Collection
+	pub  *mq.Publisher
 }
 
-func NewDocService(db *mongo.Database) *DocService {
-	return &DocService{coll: db.Collection("documents")}
+func NewDocService(db *mongo.Database, pub *mq.Publisher) *DocService {
+	return &DocService{coll: db.Collection("documents"), pub: pub}
 }
 
 func (s *DocService) CreateDoc(ctx context.Context, req *docpb.CreateDocRequest) (*docpb.DocInfo, error) {
@@ -45,6 +48,18 @@ func (s *DocService) CreateDoc(ctx context.Context, req *docpb.CreateDocRequest)
 		return nil, status.Errorf(codes.Internal, "insert doc: %v", err)
 	}
 	oid := result.InsertedID.(primitive.ObjectID)
+
+	// Publish to RabbitMQ for search indexing
+	if s.pub != nil {
+		if err := s.pub.Publish(mq.IndexMessage{
+			DocID:   oid.Hex(),
+			Title:   doc.Title,
+			Content: string(doc.Content),
+		}); err != nil {
+			log.Printf("publish index msg for doc %s: %v", oid.Hex(), err)
+		}
+	}
+
 	return &docpb.DocInfo{
 		DocId:     oid.Hex(),
 		Title:     doc.Title,
@@ -119,6 +134,18 @@ func (s *DocService) UpdateDoc(ctx context.Context, req *docpb.UpdateDocRequest)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "update doc: %v", err)
 	}
+
+	// Publish to RabbitMQ for search indexing
+	if s.pub != nil {
+		if err := s.pub.Publish(mq.IndexMessage{
+			DocID:   req.DocId,
+			Title:   req.Title,
+			Content: string(req.Content),
+		}); err != nil {
+			log.Printf("publish index msg for doc %s: %v", req.DocId, err)
+		}
+	}
+
 	return s.GetDoc(ctx, &docpb.GetDocRequest{DocId: req.DocId})
 }
 
