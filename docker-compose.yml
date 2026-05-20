@@ -170,12 +170,15 @@ services:
       COLLAB_GRPC_PORT: "9003"
       REDIS_ADDR: "redis:6379"
       MONGO_URI: "mongodb://mongodb:27017"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
       ETCD_ENDPOINTS: "etcd:2379"
       OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4318"
     depends_on:
       redis:
         condition: service_healthy
       mongodb:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       etcd:
         condition: service_started
