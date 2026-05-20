@@ -70,7 +70,7 @@ func (h *Handler) Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user_id": resp.UserId, "token": resp.Token})
+	c.JSON(http.StatusOK, gin.H{"user_id": resp.UserId, "token": resp.Token, "username": req.Username})
 }
 
 func (h *Handler) Login(c *gin.Context) {
@@ -263,6 +263,57 @@ func (h *Handler) SearchDocs(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handler) ShareDoc(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	docID := c.Param("id")
+	var req struct {
+		Username string `json:"username" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userConn, err := h.dialService("user-service", "USER_SERVICE_ADDR", "user-service:9001")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "service unavailable"})
+		return
+	}
+	defer userConn.Close()
+
+	userClient := userpb.NewUserServiceClient(userConn)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	target, err := userClient.LookupByUsername(ctx, &userpb.LookupByUsernameRequest{Username: req.Username})
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	docConn, err := h.dialService("doc-service", "DOC_SERVICE_ADDR", "doc-service:9002")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "service unavailable"})
+		return
+	}
+	defer docConn.Close()
+
+	docClient := docpb.NewDocServiceClient(docConn)
+	ctx2, cancel2 := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel2()
+
+	resp, err := docClient.ShareDoc(ctx2, &docpb.ShareDocRequest{
+		DocId:          docID,
+		OwnerId:        userID,
+		CollaboratorId: target.UserId,
+	})
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": resp.Success, "collaborator": target.Username})
 }
 
 var _ = auth.GenerateToken // keep import

@@ -33,6 +33,7 @@ func Setup(h *handler.Handler) *gin.Engine {
 		authed.POST("/docs", h.CreateDoc)
 		authed.GET("/docs/:id", h.GetDoc)
 		authed.PUT("/docs/:id", h.SaveDoc)
+		authed.POST("/docs/:id/share", h.ShareDoc)
 		authed.GET("/docs", h.ListDocs)
 		authed.GET("/search", h.SearchDocs)
 	}

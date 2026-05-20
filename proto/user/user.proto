@@ -8,6 +8,7 @@ service UserService {
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc GetUser(GetUserRequest) returns (UserInfo);
   rpc UpdateUser(UpdateUserRequest) returns (UserInfo);
+  rpc LookupByUsername(LookupByUsernameRequest) returns (UserInfo);
 }
 
 message RegisterRequest {
@@ -48,4 +49,8 @@ message UserInfo {
   string email = 3;
   string avatar_url = 4;
   string created_at = 5;
+}
+
+message LookupByUsernameRequest {
+  string username = 1;
 }

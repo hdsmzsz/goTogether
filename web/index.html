@@ -27,7 +27,7 @@
         .search-bar { display: flex; gap: 8px; margin-bottom: 24px; }
         .search-bar input { flex: 1; padding: 10px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
         .toolbar { display: flex; gap: 12px; margin-bottom: 24px; align-items: center; }
-        .user-info { color: white; font-size: 14px; }
+        .user-info { color: white; font-size: 14px; display: flex; align-items: center; gap: 12px; }
         .hidden { display: none; }
         #status { padding: 8px; margin-top: 8px; border-radius: 6px; font-size: 13px; }
         .status-ok { background: #d1fae5; color: #065f46; }
@@ -112,6 +112,7 @@
                 if (data.token) {
                     token = data.token;
                     localStorage.setItem('token', token);
+                    if (data.username) localStorage.setItem('username', data.username);
                     showStatus('Success!', false);
                     showDashboard();
                 } else {
@@ -127,13 +128,15 @@
             document.getElementById('dashboard').classList.remove('hidden');
             document.getElementById('userInfo').classList.remove('hidden');
             document.getElementById('logoutBtn').classList.remove('hidden');
-            document.getElementById('userInfo').textContent = 'Logged in';
+            const username = localStorage.getItem('username') || 'User';
+            document.getElementById('userInfo').textContent = 'Hello, ' + username;
             loadDocs();
         }
 
         function logout() {
             token = null;
             localStorage.removeItem('token');
+            localStorage.removeItem('username');
             location.reload();
         }
 

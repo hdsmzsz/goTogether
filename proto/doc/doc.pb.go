@@ -201,6 +201,7 @@ type DocDetail struct {
 	Content       []byte                 `protobuf:"bytes,4,opt,name=content,proto3" json:"content,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     string                 `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Collaborators []int64                `protobuf:"varint,7,rep,packed,name=collaborators,proto3" json:"collaborators,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -275,6 +276,13 @@ func (x *DocDetail) GetUpdatedAt() string {
 		return x.UpdatedAt
 	}
 	return ""
+}
+
+func (x *DocDetail) GetCollaborators() []int64 {
+	if x != nil {
+		return x.Collaborators
+	}
+	return nil
 }
 
 type ListDocsRequest struct {
@@ -665,6 +673,110 @@ func (x *UploadImageResponse) GetUrl() string {
 	return ""
 }
 
+type ShareDocRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	DocId          string                 `protobuf:"bytes,1,opt,name=doc_id,json=docId,proto3" json:"doc_id,omitempty"`
+	OwnerId        int64                  `protobuf:"varint,2,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
+	CollaboratorId int64                  `protobuf:"varint,3,opt,name=collaborator_id,json=collaboratorId,proto3" json:"collaborator_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ShareDocRequest) Reset() {
+	*x = ShareDocRequest{}
+	mi := &file_proto_doc_doc_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShareDocRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShareDocRequest) ProtoMessage() {}
+
+func (x *ShareDocRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_doc_doc_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShareDocRequest.ProtoReflect.Descriptor instead.
+func (*ShareDocRequest) Descriptor() ([]byte, []int) {
+	return file_proto_doc_doc_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ShareDocRequest) GetDocId() string {
+	if x != nil {
+		return x.DocId
+	}
+	return ""
+}
+
+func (x *ShareDocRequest) GetOwnerId() int64 {
+	if x != nil {
+		return x.OwnerId
+	}
+	return 0
+}
+
+func (x *ShareDocRequest) GetCollaboratorId() int64 {
+	if x != nil {
+		return x.CollaboratorId
+	}
+	return 0
+}
+
+type ShareDocResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ShareDocResponse) Reset() {
+	*x = ShareDocResponse{}
+	mi := &file_proto_doc_doc_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ShareDocResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ShareDocResponse) ProtoMessage() {}
+
+func (x *ShareDocResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_doc_doc_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ShareDocResponse.ProtoReflect.Descriptor instead.
+func (*ShareDocResponse) Descriptor() ([]byte, []int) {
+	return file_proto_doc_doc_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ShareDocResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
 var File_proto_doc_doc_proto protoreflect.FileDescriptor
 
 const file_proto_doc_doc_proto_rawDesc = "" +
@@ -682,7 +794,7 @@ const file_proto_doc_doc_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\x05 \x01(\tR\tupdatedAt\"&\n" +
 	"\rGetDocRequest\x12\x15\n" +
-	"\x06doc_id\x18\x01 \x01(\tR\x05docId\"\xab\x01\n" +
+	"\x06doc_id\x18\x01 \x01(\tR\x05docId\"\xd1\x01\n" +
 	"\tDocDetail\x12\x15\n" +
 	"\x06doc_id\x18\x01 \x01(\tR\x05docId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x19\n" +
@@ -691,7 +803,8 @@ const file_proto_doc_doc_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\tR\tupdatedAt\"]\n" +
+	"updated_at\x18\x06 \x01(\tR\tupdatedAt\x12$\n" +
+	"\rcollaborators\x18\a \x03(\x03R\rcollaborators\"]\n" +
 	"\x0fListDocsRequest\x12\x19\n" +
 	"\bowner_id\x18\x01 \x01(\x03R\aownerId\x12\x12\n" +
 	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x1b\n" +
@@ -715,7 +828,13 @@ const file_proto_doc_doc_proto_rawDesc = "" +
 	"\x04data\x18\x03 \x01(\fR\x04data\x12!\n" +
 	"\fcontent_type\x18\x04 \x01(\tR\vcontentType\"'\n" +
 	"\x13UploadImageResponse\x12\x10\n" +
-	"\x03url\x18\x01 \x01(\tR\x03url2\xd7\x02\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\"l\n" +
+	"\x0fShareDocRequest\x12\x15\n" +
+	"\x06doc_id\x18\x01 \x01(\tR\x05docId\x12\x19\n" +
+	"\bowner_id\x18\x02 \x01(\x03R\aownerId\x12'\n" +
+	"\x0fcollaborator_id\x18\x03 \x01(\x03R\x0ecollaboratorId\",\n" +
+	"\x10ShareDocResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2\x90\x03\n" +
 	"\n" +
 	"DocService\x120\n" +
 	"\tCreateDoc\x12\x15.doc.CreateDocRequest\x1a\f.doc.DocInfo\x12,\n" +
@@ -723,7 +842,8 @@ const file_proto_doc_doc_proto_rawDesc = "" +
 	"\bListDocs\x12\x14.doc.ListDocsRequest\x1a\x15.doc.ListDocsResponse\x122\n" +
 	"\tUpdateDoc\x12\x15.doc.UpdateDocRequest\x1a\x0e.doc.DocDetail\x12:\n" +
 	"\tDeleteDoc\x12\x15.doc.DeleteDocRequest\x1a\x16.doc.DeleteDocResponse\x12@\n" +
-	"\vUploadImage\x12\x17.doc.UploadImageRequest\x1a\x18.doc.UploadImageResponseB'Z%github.com/spike/goTogether/proto/docb\x06proto3"
+	"\vUploadImage\x12\x17.doc.UploadImageRequest\x1a\x18.doc.UploadImageResponse\x127\n" +
+	"\bShareDoc\x12\x14.doc.ShareDocRequest\x1a\x15.doc.ShareDocResponseB'Z%github.com/spike/goTogether/proto/docb\x06proto3"
 
 var (
 	file_proto_doc_doc_proto_rawDescOnce sync.Once
@@ -737,7 +857,7 @@ func file_proto_doc_doc_proto_rawDescGZIP() []byte {
 	return file_proto_doc_doc_proto_rawDescData
 }
 
-var file_proto_doc_doc_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_proto_doc_doc_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_proto_doc_doc_proto_goTypes = []any{
 	(*CreateDocRequest)(nil),    // 0: doc.CreateDocRequest
 	(*DocInfo)(nil),             // 1: doc.DocInfo
@@ -750,6 +870,8 @@ var file_proto_doc_doc_proto_goTypes = []any{
 	(*DeleteDocResponse)(nil),   // 8: doc.DeleteDocResponse
 	(*UploadImageRequest)(nil),  // 9: doc.UploadImageRequest
 	(*UploadImageResponse)(nil), // 10: doc.UploadImageResponse
+	(*ShareDocRequest)(nil),     // 11: doc.ShareDocRequest
+	(*ShareDocResponse)(nil),    // 12: doc.ShareDocResponse
 }
 var file_proto_doc_doc_proto_depIdxs = []int32{
 	1,  // 0: doc.ListDocsResponse.docs:type_name -> doc.DocInfo
@@ -759,14 +881,16 @@ var file_proto_doc_doc_proto_depIdxs = []int32{
 	6,  // 4: doc.DocService.UpdateDoc:input_type -> doc.UpdateDocRequest
 	7,  // 5: doc.DocService.DeleteDoc:input_type -> doc.DeleteDocRequest
 	9,  // 6: doc.DocService.UploadImage:input_type -> doc.UploadImageRequest
-	1,  // 7: doc.DocService.CreateDoc:output_type -> doc.DocInfo
-	3,  // 8: doc.DocService.GetDoc:output_type -> doc.DocDetail
-	5,  // 9: doc.DocService.ListDocs:output_type -> doc.ListDocsResponse
-	3,  // 10: doc.DocService.UpdateDoc:output_type -> doc.DocDetail
-	8,  // 11: doc.DocService.DeleteDoc:output_type -> doc.DeleteDocResponse
-	10, // 12: doc.DocService.UploadImage:output_type -> doc.UploadImageResponse
-	7,  // [7:13] is the sub-list for method output_type
-	1,  // [1:7] is the sub-list for method input_type
+	11, // 7: doc.DocService.ShareDoc:input_type -> doc.ShareDocRequest
+	1,  // 8: doc.DocService.CreateDoc:output_type -> doc.DocInfo
+	3,  // 9: doc.DocService.GetDoc:output_type -> doc.DocDetail
+	5,  // 10: doc.DocService.ListDocs:output_type -> doc.ListDocsResponse
+	3,  // 11: doc.DocService.UpdateDoc:output_type -> doc.DocDetail
+	8,  // 12: doc.DocService.DeleteDoc:output_type -> doc.DeleteDocResponse
+	10, // 13: doc.DocService.UploadImage:output_type -> doc.UploadImageResponse
+	12, // 14: doc.DocService.ShareDoc:output_type -> doc.ShareDocResponse
+	8,  // [8:15] is the sub-list for method output_type
+	1,  // [1:8] is the sub-list for method input_type
 	1,  // [1:1] is the sub-list for extension type_name
 	1,  // [1:1] is the sub-list for extension extendee
 	0,  // [0:1] is the sub-list for field type_name
@@ -783,7 +907,7 @@ func file_proto_doc_doc_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_doc_doc_proto_rawDesc), len(file_proto_doc_doc_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

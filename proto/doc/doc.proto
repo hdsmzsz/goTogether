@@ -10,6 +10,7 @@ service DocService {
   rpc UpdateDoc(UpdateDocRequest) returns (DocDetail);
   rpc DeleteDoc(DeleteDocRequest) returns (DeleteDocResponse);
   rpc UploadImage(UploadImageRequest) returns (UploadImageResponse);
+  rpc ShareDoc(ShareDocRequest) returns (ShareDocResponse);
 }
 
 message CreateDocRequest {
@@ -36,6 +37,7 @@ message DocDetail {
   bytes content = 4;
   string created_at = 5;
   string updated_at = 6;
+  repeated int64 collaborators = 7;
 }
 
 message ListDocsRequest {
@@ -74,4 +76,14 @@ message UploadImageRequest {
 
 message UploadImageResponse {
   string url = 1;
+}
+
+message ShareDocRequest {
+  string doc_id = 1;
+  int64 owner_id = 2;
+  int64 collaborator_id = 3;
+}
+
+message ShareDocResponse {
+  bool success = 1;
 }

@@ -425,6 +425,50 @@ func (x *UserInfo) GetCreatedAt() string {
 	return ""
 }
 
+type LookupByUsernameRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LookupByUsernameRequest) Reset() {
+	*x = LookupByUsernameRequest{}
+	mi := &file_proto_user_user_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LookupByUsernameRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LookupByUsernameRequest) ProtoMessage() {}
+
+func (x *LookupByUsernameRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_user_user_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LookupByUsernameRequest.ProtoReflect.Descriptor instead.
+func (*LookupByUsernameRequest) Descriptor() ([]byte, []int) {
+	return file_proto_user_user_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *LookupByUsernameRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
 var File_proto_user_user_proto protoreflect.FileDescriptor
 
 const file_proto_user_user_proto_rawDesc = "" +
@@ -458,13 +502,16 @@ const file_proto_user_user_proto_rawDesc = "" +
 	"\n" +
 	"avatar_url\x18\x04 \x01(\tR\tavatarUrl\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\tR\tcreatedAt2\xe2\x01\n" +
+	"created_at\x18\x05 \x01(\tR\tcreatedAt\"5\n" +
+	"\x17LookupByUsernameRequest\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername2\xa5\x02\n" +
 	"\vUserService\x129\n" +
 	"\bRegister\x12\x15.user.RegisterRequest\x1a\x16.user.RegisterResponse\x120\n" +
 	"\x05Login\x12\x12.user.LoginRequest\x1a\x13.user.LoginResponse\x12/\n" +
 	"\aGetUser\x12\x14.user.GetUserRequest\x1a\x0e.user.UserInfo\x125\n" +
 	"\n" +
-	"UpdateUser\x12\x17.user.UpdateUserRequest\x1a\x0e.user.UserInfoB(Z&github.com/spike/goTogether/proto/userb\x06proto3"
+	"UpdateUser\x12\x17.user.UpdateUserRequest\x1a\x0e.user.UserInfo\x12A\n" +
+	"\x10LookupByUsername\x12\x1d.user.LookupByUsernameRequest\x1a\x0e.user.UserInfoB(Z&github.com/spike/goTogether/proto/userb\x06proto3"
 
 var (
 	file_proto_user_user_proto_rawDescOnce sync.Once
@@ -478,27 +525,30 @@ func file_proto_user_user_proto_rawDescGZIP() []byte {
 	return file_proto_user_user_proto_rawDescData
 }
 
-var file_proto_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_proto_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_proto_user_user_proto_goTypes = []any{
-	(*RegisterRequest)(nil),   // 0: user.RegisterRequest
-	(*RegisterResponse)(nil),  // 1: user.RegisterResponse
-	(*LoginRequest)(nil),      // 2: user.LoginRequest
-	(*LoginResponse)(nil),     // 3: user.LoginResponse
-	(*GetUserRequest)(nil),    // 4: user.GetUserRequest
-	(*UpdateUserRequest)(nil), // 5: user.UpdateUserRequest
-	(*UserInfo)(nil),          // 6: user.UserInfo
+	(*RegisterRequest)(nil),         // 0: user.RegisterRequest
+	(*RegisterResponse)(nil),        // 1: user.RegisterResponse
+	(*LoginRequest)(nil),            // 2: user.LoginRequest
+	(*LoginResponse)(nil),           // 3: user.LoginResponse
+	(*GetUserRequest)(nil),          // 4: user.GetUserRequest
+	(*UpdateUserRequest)(nil),       // 5: user.UpdateUserRequest
+	(*UserInfo)(nil),                // 6: user.UserInfo
+	(*LookupByUsernameRequest)(nil), // 7: user.LookupByUsernameRequest
 }
 var file_proto_user_user_proto_depIdxs = []int32{
 	0, // 0: user.UserService.Register:input_type -> user.RegisterRequest
 	2, // 1: user.UserService.Login:input_type -> user.LoginRequest
 	4, // 2: user.UserService.GetUser:input_type -> user.GetUserRequest
 	5, // 3: user.UserService.UpdateUser:input_type -> user.UpdateUserRequest
-	1, // 4: user.UserService.Register:output_type -> user.RegisterResponse
-	3, // 5: user.UserService.Login:output_type -> user.LoginResponse
-	6, // 6: user.UserService.GetUser:output_type -> user.UserInfo
-	6, // 7: user.UserService.UpdateUser:output_type -> user.UserInfo
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
+	7, // 4: user.UserService.LookupByUsername:input_type -> user.LookupByUsernameRequest
+	1, // 5: user.UserService.Register:output_type -> user.RegisterResponse
+	3, // 6: user.UserService.Login:output_type -> user.LoginResponse
+	6, // 7: user.UserService.GetUser:output_type -> user.UserInfo
+	6, // 8: user.UserService.UpdateUser:output_type -> user.UserInfo
+	6, // 9: user.UserService.LookupByUsername:output_type -> user.UserInfo
+	5, // [5:10] is the sub-list for method output_type
+	0, // [0:5] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -515,7 +565,7 @@ func file_proto_user_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_user_user_proto_rawDesc), len(file_proto_user_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
