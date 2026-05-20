@@ -13,6 +13,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spike/goTogether/doc-service/mq"
 	"github.com/spike/goTogether/doc-service/service"
+	"github.com/spike/goTogether/doc-service/storage"
 	"github.com/spike/goTogether/pkg/discovery"
 	"github.com/spike/goTogether/pkg/tracing"
 	docpb "github.com/spike/goTogether/proto/doc"
@@ -73,8 +74,13 @@ func main() {
 		defer pub.Close()
 	}
 
+	images, err := storage.NewImageStore()
+	if err != nil {
+		log.Printf("minio init failed (image upload disabled): %v", err)
+	}
+
 	srv := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
-	docpb.RegisterDocServiceServer(srv, service.NewDocService(db, pub, rdb))
+	docpb.RegisterDocServiceServer(srv, service.NewDocService(db, pub, rdb, images))
 
 	metricsPort := os.Getenv("DOC_METRICS_PORT")
 	if metricsPort == "" {

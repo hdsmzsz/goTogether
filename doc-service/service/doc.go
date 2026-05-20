@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/redis/go-redis/v9"
 	"github.com/spike/goTogether/doc-service/mq"
+	"github.com/spike/goTogether/doc-service/storage"
 	docpb "github.com/spike/goTogether/proto/doc"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -44,13 +45,14 @@ type Document struct {
 
 type DocService struct {
 	docpb.UnimplementedDocServiceServer
-	coll *mongo.Collection
-	pub  *mq.Publisher
-	rdb  *redis.Client
+	coll   *mongo.Collection
+	pub    *mq.Publisher
+	rdb    *redis.Client
+	images *storage.ImageStore
 }
 
-func NewDocService(db *mongo.Database, pub *mq.Publisher, rdb *redis.Client) *DocService {
-	return &DocService{coll: db.Collection("documents"), pub: pub, rdb: rdb}
+func NewDocService(db *mongo.Database, pub *mq.Publisher, rdb *redis.Client, images *storage.ImageStore) *DocService {
+	return &DocService{coll: db.Collection("documents"), pub: pub, rdb: rdb, images: images}
 }
 
 func cacheKey(docID string) string { return "doc:meta:" + docID }
@@ -253,6 +255,15 @@ func (s *DocService) ShareDoc(ctx context.Context, req *docpb.ShareDocRequest) (
 }
 
 func (s *DocService) UploadImage(ctx context.Context, req *docpb.UploadImageRequest) (*docpb.UploadImageResponse, error) {
-	// TODO: integrate MinIO for image upload
-	return &docpb.UploadImageResponse{Url: "/images/" + req.Filename}, nil
+	if s.images == nil {
+		return nil, status.Errorf(codes.Unavailable, "image storage not configured")
+	}
+	if len(req.Data) == 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "empty data")
+	}
+	url, err := s.images.Upload(ctx, req.DocId, req.Filename, req.ContentType, req.Data)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "upload: %v", err)
+	}
+	return &docpb.UploadImageResponse{Url: url}, nil
 }
