@@ -11,3 +11,5 @@ vendor/
 
 # benchmark binaries
 benchmark/collab_bench
+benchmark/node_modules
+benchmark/package-lock.json

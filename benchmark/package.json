@@ -1,0 +1,9 @@
+{
+  "name": "gotogether-benchmark",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "yjs": "^13.6.20",
+    "ws": "^8.18.0"
+  }
+}
