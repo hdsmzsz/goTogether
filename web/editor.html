@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>goTogether Editor (Yjs CRDT)</title>
+    <title>goTogether Editor (Yjs + Quill)</title>
+    <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; }
@@ -11,8 +12,10 @@
         .toolbar a { color: white; text-decoration: none; font-size: 14px; }
         .toolbar h2 { font-size: 18px; }
         .status-bar { background: #e2e8f0; padding: 8px 24px; display: flex; gap: 16px; font-size: 13px; color: #64748b; }
-        #editor { max-width: 800px; width: 100%; margin: 24px auto; min-height: 600px; background: white; padding: 48px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); outline: none; font-size: 16px; line-height: 1.8; font-family: inherit; resize: vertical; border: none; display: block; }
-        .editor-wrap { max-width: 800px; margin: 24px auto; }
+        .editor-wrap { max-width: 800px; margin: 24px auto; background: white; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: hidden; }
+        .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+        .ql-container.ql-snow { border: none; }
+        .ql-editor { min-height: 600px; font-size: 16px; line-height: 1.8; padding: 48px; }
         .ws-status { display: inline-flex; align-items: center; gap: 4px; }
         .ws-dot { width: 8px; height: 8px; border-radius: 50%; }
         .ws-connected { background: #22c55e; }
@@ -45,7 +48,7 @@
         <div style="display:flex;align-items:center;gap:16px;">
             <a href="/static/index.html">< Back</a>
             <h2 id="docTitle">Loading...</h2>
-            <span class="crdt-badge">Yjs CRDT</span>
+            <span class="crdt-badge">Yjs · Quill</span>
         </div>
         <div style="display:flex;align-items:center;gap:12px;">
             <button class="btn-share" onclick="openShareModal()">Share</button>
@@ -62,7 +65,7 @@
         <span id="docInfo" style="margin-left:auto;color:#94a3b8;font-family:monospace;font-size:11px;"></span>
     </div>
     <div class="editor-wrap">
-        <textarea id="editor" placeholder="Start typing... (collaborative via Yjs)"></textarea>
+        <div id="editor"></div>
     </div>
 
     <div class="modal-overlay" id="shareModal">
@@ -79,6 +82,8 @@
 
     <script type="module">
         import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.6.20/+esm';
+        import Quill from 'https://cdn.jsdelivr.net/npm/quill@1.3.7/+esm';
+        import { QuillBinding } from 'https://cdn.jsdelivr.net/npm/y-quill@0.1.5/+esm';
 
         const params = new URLSearchParams(window.location.search);
         const docId = params.get('id');
@@ -88,10 +93,25 @@
 
         const ydoc = new Y.Doc();
         const ytext = ydoc.getText('content');
-        const editor = document.getElementById('editor');
+
+        const quill = new Quill('#editor', {
+            theme: 'snow',
+            placeholder: 'Start typing...',
+            modules: {
+                toolbar: [
+                    [{ header: [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ list: 'ordered' }, { list: 'bullet' }],
+                    [{ align: [] }],
+                    ['blockquote', 'code-block', 'link'],
+                    [{ color: [] }, { background: [] }],
+                    ['clean'],
+                ],
+            },
+        });
+        const binding = new QuillBinding(ytext, quill);
 
         let ws = null;
-        let lastValue = '';
         let updatesApplied = 0;
         let updatesSent = 0;
 
@@ -112,48 +132,15 @@
             document.getElementById('docInfo').textContent =
                 `doc=${docId} · ws=${ws ? ['CONNECTING','OPEN','CLOSING','CLOSED'][ws.readyState] : 'NULL'}`;
         }
-        console.log('[Yjs editor] booted, docId=', docId, 'WS=', WS_URL);
+        console.log('[Yjs+Quill] booted, docId=', docId, 'WS=', WS_URL);
 
         ydoc.on('update', (update, origin) => {
             if (origin === 'remote') return;
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({type: 'update', payload: uint8ToBase64(update)}));
                 updatesSent++;
-                console.log('[Yjs] sent local update', update.length, 'bytes');
                 updateStatus();
-            } else {
-                console.warn('[Yjs] local edit but WS not open, state=', ws?.readyState);
             }
-        });
-
-        ytext.observe(() => {
-            const newValue = ytext.toString();
-            if (newValue === editor.value) return;
-            const cursorPos = editor.selectionStart;
-            const wasAtEnd = cursorPos === editor.value.length;
-            editor.value = newValue;
-            lastValue = newValue;
-            const newPos = wasAtEnd ? newValue.length : Math.min(cursorPos, newValue.length);
-            editor.setSelectionRange(newPos, newPos);
-            updateStatus();
-        });
-
-        editor.addEventListener('input', () => {
-            const newValue = editor.value;
-            if (newValue === lastValue) return;
-            let prefix = 0;
-            while (prefix < lastValue.length && prefix < newValue.length
-                   && lastValue[prefix] === newValue[prefix]) prefix++;
-            let suffix = 0;
-            while (suffix < lastValue.length - prefix && suffix < newValue.length - prefix
-                   && lastValue[lastValue.length - 1 - suffix] === newValue[newValue.length - 1 - suffix]) suffix++;
-            const deleted = lastValue.length - prefix - suffix;
-            const inserted = newValue.substring(prefix, newValue.length - suffix);
-            ydoc.transact(() => {
-                if (deleted > 0) ytext.delete(prefix, deleted);
-                if (inserted.length > 0) ytext.insert(prefix, inserted);
-            });
-            lastValue = newValue;
         });
 
         async function loadDoc() {
@@ -177,17 +164,18 @@
                 if (state.length > 2) {
                     ws.send(JSON.stringify({type: 'update', payload: uint8ToBase64(state)}));
                 }
+                updateStatus();
             };
             ws.onclose = () => {
                 document.getElementById('wsDot').className = 'ws-dot ws-disconnected';
                 document.getElementById('wsLabel').textContent = 'Disconnected';
+                updateStatus();
                 setTimeout(connectWS, 3000);
             };
             ws.onmessage = (e) => {
                 try {
                     const msg = JSON.parse(e.data);
                     if (msg.type === 'sync' && Array.isArray(msg.updates)) {
-                        console.log('[Yjs] received sync with', msg.updates.length, 'updates');
                         let skipped = 0;
                         for (const u of msg.updates) {
                             try {
@@ -200,7 +188,6 @@
                         if (skipped > 0) console.warn('[Yjs] skipped', skipped, 'invalid updates (legacy data)');
                         updateStatus();
                     } else if (msg.type === 'update' && msg.payload) {
-                        console.log('[Yjs] received remote update');
                         try {
                             Y.applyUpdate(ydoc, base64ToUint8(msg.payload), 'remote');
                             updatesApplied++;
@@ -228,7 +215,7 @@
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + token,
                     },
-                    body: JSON.stringify({content: editor.value}),
+                    body: JSON.stringify({content: quill.getText()}),
                 });
                 if (res.ok) {
                     btn.className = 'btn-save saved';
@@ -248,6 +235,7 @@
                 btn.textContent = 'Save';
             }
         }
+        window.saveDoc = saveDoc;
 
         document.addEventListener('keydown', (e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -265,7 +253,6 @@
         window.closeShareModal = () => {
             document.getElementById('shareModal').classList.remove('active');
         };
-        window.saveDoc = saveDoc;
         window.shareDoc = async () => {
             const username = document.getElementById('shareUsername').value.trim();
             if (!username) return;
