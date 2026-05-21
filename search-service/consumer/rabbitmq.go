@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/spike/goTogether/search-service/service"
@@ -26,31 +27,52 @@ func NewConsumer(conn *amqp.Connection, indexer *service.SearchService) *Consume
 	return &Consumer{conn: conn, indexer: indexer}
 }
 
+// Start runs the consumer loop with automatic reconnect on channel close.
+// Returns only when ctx is cancelled.
 func (c *Consumer) Start(ctx context.Context) {
+	for {
+		if err := c.consumeOnce(ctx); err != nil {
+			log.Printf("consumer disconnected: %v — reconnecting in 3s", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(3 * time.Second):
+		}
+	}
+}
+
+func (c *Consumer) consumeOnce(ctx context.Context) error {
 	ch, err := c.conn.Channel()
 	if err != nil {
-		log.Fatalf("rabbitmq channel: %v", err)
+		return err
 	}
 	defer ch.Close()
 
-	q, err := ch.QueueDeclare(queueName, true, false, false, false, nil)
-	if err != nil {
-		log.Fatalf("queue declare: %v", err)
+	if _, err := ch.QueueDeclare(queueName, true, false, false, false, nil); err != nil {
+		return err
 	}
 
-	msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
+	msgs, err := ch.Consume(queueName, "", false, false, false, false, nil)
 	if err != nil {
-		log.Fatalf("consume: %v", err)
+		return err
 	}
+
+	closeCh := ch.NotifyClose(make(chan *amqp.Error, 1))
 
 	log.Printf("search consumer started, listening on queue=%s", queueName)
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			return nil
+		case e := <-closeCh:
+			if e != nil {
+				return e
+			}
+			return amqp.ErrClosed
 		case d, ok := <-msgs:
 			if !ok {
-				return
+				return amqp.ErrClosed
 			}
 			var msg IndexMessage
 			if err := json.Unmarshal(d.Body, &msg); err != nil {

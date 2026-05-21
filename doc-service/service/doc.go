@@ -207,17 +207,22 @@ func (s *DocService) UpdateDoc(ctx context.Context, req *docpb.UpdateDocRequest)
 
 	s.cacheDel(ctx, req.DocId)
 
+	detail, err := s.GetDoc(ctx, &docpb.GetDocRequest{DocId: req.DocId})
+	if err != nil {
+		return nil, err
+	}
+
 	if s.pub != nil {
 		if err := s.pub.Publish(mq.IndexMessage{
 			DocID:   req.DocId,
-			Title:   req.Title,
+			Title:   detail.Title,
 			Content: string(req.Content),
 		}); err != nil {
 			log.Printf("publish index msg for doc %s: %v", req.DocId, err)
 		}
 	}
 
-	return s.GetDoc(ctx, &docpb.GetDocRequest{DocId: req.DocId})
+	return detail, nil
 }
 
 func (s *DocService) DeleteDoc(ctx context.Context, req *docpb.DeleteDocRequest) (*docpb.DeleteDocResponse, error) {
