@@ -42,6 +42,12 @@ type Client struct {
 	Username string
 	Conn     *websocket.Conn
 	Send     chan []byte
+	done     chan struct{}
+	once     sync.Once
+}
+
+func (c *Client) closeDone() {
+	c.once.Do(func() { close(c.done) })
 }
 
 type Hub struct {
@@ -99,17 +105,25 @@ func (h *Hub) Run() {
 
 		case client := <-h.unregister:
 			h.mu.Lock()
+			removed := false
 			if clients, ok := h.rooms[client.DocID]; ok {
-				delete(clients, client)
-				if len(clients) == 0 {
-					delete(h.rooms, client.DocID)
+				if _, exists := clients[client]; exists {
+					delete(clients, client)
+					removed = true
+					if len(clients) == 0 {
+						delete(h.rooms, client.DocID)
+					}
 				}
 			}
-			close(client.Send)
-			wsConnections.Dec()
-			wsRooms.Set(float64(len(h.rooms)))
+			if removed {
+				wsConnections.Dec()
+				wsRooms.Set(float64(len(h.rooms)))
+			}
 			h.mu.Unlock()
-			log.Printf("client left doc=%s user=%d", client.DocID, client.UserID)
+			client.closeDone()
+			if removed {
+				log.Printf("client left doc=%s user=%d", client.DocID, client.UserID)
+			}
 
 		case msg := <-h.broadcast:
 			wsMsgSent.Inc()
@@ -141,9 +155,15 @@ func (h *Hub) Run() {
 			for _, c := range targets {
 				go func(c *Client) {
 					select {
+					case <-c.done:
+						return
 					case c.Send <- outbound:
+						return
 					default:
-						h.unregister <- c
+					}
+					select {
+					case h.unregister <- c:
+					case <-c.done:
 					}
 				}(c)
 			}
@@ -187,6 +207,7 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		DocID: docID,
 		Conn:  conn,
 		Send:  make(chan []byte, 256),
+		done:  make(chan struct{}),
 	}
 	h.register <- client
 
@@ -228,11 +249,10 @@ func (h *Hub) writePump(c *Client) {
 	}()
 	for {
 		select {
-		case msg, ok := <-c.Send:
-			if !ok {
-				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
+		case <-c.done:
+			c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+			return
+		case msg := <-c.Send:
 			c.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			c.Conn.WriteMessage(websocket.TextMessage, msg)
 		case <-ticker.C:
