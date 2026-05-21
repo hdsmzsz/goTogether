@@ -59,6 +59,7 @@
     </div>
     <div class="status-bar">
         <span id="syncInfo">Yjs: 0 updates applied · 0 sent</span>
+        <span id="docInfo" style="margin-left:auto;color:#94a3b8;font-family:monospace;font-size:11px;"></span>
     </div>
     <div class="editor-wrap">
         <textarea id="editor" placeholder="Start typing... (collaborative via Yjs)"></textarea>
@@ -108,14 +109,20 @@
         function updateStatus() {
             document.getElementById('syncInfo').textContent =
                 `Yjs: ${updatesApplied} updates applied · ${updatesSent} sent · doc state ${Y.encodeStateAsUpdate(ydoc).length}B`;
+            document.getElementById('docInfo').textContent =
+                `doc=${docId} · ws=${ws ? ['CONNECTING','OPEN','CLOSING','CLOSED'][ws.readyState] : 'NULL'}`;
         }
+        console.log('[Yjs editor] booted, docId=', docId, 'WS=', WS_URL);
 
         ydoc.on('update', (update, origin) => {
             if (origin === 'remote') return;
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({type: 'update', payload: uint8ToBase64(update)}));
                 updatesSent++;
+                console.log('[Yjs] sent local update', update.length, 'bytes');
                 updateStatus();
+            } else {
+                console.warn('[Yjs] local edit but WS not open, state=', ws?.readyState);
             }
         });
 
@@ -180,20 +187,33 @@
                 try {
                     const msg = JSON.parse(e.data);
                     if (msg.type === 'sync' && Array.isArray(msg.updates)) {
+                        console.log('[Yjs] received sync with', msg.updates.length, 'updates');
+                        let skipped = 0;
                         for (const u of msg.updates) {
-                            Y.applyUpdate(ydoc, base64ToUint8(u), 'remote');
-                            updatesApplied++;
+                            try {
+                                Y.applyUpdate(ydoc, base64ToUint8(u), 'remote');
+                                updatesApplied++;
+                            } catch (e2) {
+                                skipped++;
+                            }
                         }
+                        if (skipped > 0) console.warn('[Yjs] skipped', skipped, 'invalid updates (legacy data)');
                         updateStatus();
                     } else if (msg.type === 'update' && msg.payload) {
-                        Y.applyUpdate(ydoc, base64ToUint8(msg.payload), 'remote');
-                        updatesApplied++;
+                        console.log('[Yjs] received remote update');
+                        try {
+                            Y.applyUpdate(ydoc, base64ToUint8(msg.payload), 'remote');
+                            updatesApplied++;
+                        } catch (e2) {
+                            console.warn('[Yjs] skipped invalid remote update:', e2.message);
+                        }
                         updateStatus();
                     }
                 } catch (err) {
                     console.error('ws message:', err);
                 }
             };
+            ws.onerror = (err) => console.error('[Yjs] WS error:', err);
         }
 
         async function saveDoc() {
