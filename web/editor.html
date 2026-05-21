@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>goTogether Editor</title>
+    <title>goTogether Editor (Yjs CRDT)</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; }
@@ -11,9 +11,8 @@
         .toolbar a { color: white; text-decoration: none; font-size: 14px; }
         .toolbar h2 { font-size: 18px; }
         .status-bar { background: #e2e8f0; padding: 8px 24px; display: flex; gap: 16px; font-size: 13px; color: #64748b; }
-        .collaborators { display: flex; gap: 4px; }
-        .avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold; }
-        #editor { max-width: 800px; margin: 24px auto; min-height: 600px; background: white; padding: 48px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); outline: none; font-size: 16px; line-height: 1.8; white-space: pre-wrap; }
+        #editor { max-width: 800px; width: 100%; margin: 24px auto; min-height: 600px; background: white; padding: 48px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); outline: none; font-size: 16px; line-height: 1.8; font-family: inherit; resize: vertical; border: none; display: block; }
+        .editor-wrap { max-width: 800px; margin: 24px auto; }
         .ws-status { display: inline-flex; align-items: center; gap: 4px; }
         .ws-dot { width: 8px; height: 8px; border-radius: 50%; }
         .ws-connected { background: #22c55e; }
@@ -35,10 +34,10 @@
         .modal .btn-primary { padding: 8px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
         .modal .btn-primary:hover { background: #1d4ed8; }
         .modal .btn-cancel { padding: 8px 20px; background: #f1f5f9; color: #475569; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
-        .modal .btn-cancel:hover { background: #e2e8f0; }
         .share-msg { font-size: 13px; margin-bottom: 8px; padding: 8px; border-radius: 6px; }
         .share-msg.ok { background: #d1fae5; color: #065f46; }
         .share-msg.err { background: #fee2e2; color: #991b1b; }
+        .crdt-badge { background: rgba(34,197,94,0.2); color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
     </style>
 </head>
 <body>
@@ -46,6 +45,7 @@
         <div style="display:flex;align-items:center;gap:16px;">
             <a href="/static/index.html">< Back</a>
             <h2 id="docTitle">Loading...</h2>
+            <span class="crdt-badge">Yjs CRDT</span>
         </div>
         <div style="display:flex;align-items:center;gap:12px;">
             <button class="btn-share" onclick="openShareModal()">Share</button>
@@ -58,10 +58,11 @@
         </div>
     </div>
     <div class="status-bar">
-        <span>Collaborators:</span>
-        <div id="collaborators" class="collaborators"></div>
+        <span id="syncInfo">Yjs: 0 updates applied · 0 sent</span>
     </div>
-    <div id="editor" contenteditable="true" placeholder="Start typing..."></div>
+    <div class="editor-wrap">
+        <textarea id="editor" placeholder="Start typing... (collaborative via Yjs)"></textarea>
+    </div>
 
     <div class="modal-overlay" id="shareModal">
         <div class="modal">
@@ -75,26 +76,86 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.6.20/+esm';
+
         const params = new URLSearchParams(window.location.search);
         const docId = params.get('id');
         const token = localStorage.getItem('token');
         const API = window.location.origin + '/api/v1';
         const WS_URL = 'ws://' + window.location.hostname + ':8082/ws?doc_id=' + docId;
 
-        let ws;
-        let isRemoteUpdate = false;
+        const ydoc = new Y.Doc();
+        const ytext = ydoc.getText('content');
+        const editor = document.getElementById('editor');
+
+        let ws = null;
+        let lastValue = '';
+        let updatesApplied = 0;
+        let updatesSent = 0;
+
+        function uint8ToBase64(arr) {
+            let bin = '';
+            for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
+            return btoa(bin);
+        }
+        function base64ToUint8(b64) {
+            const bin = atob(b64);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            return arr;
+        }
+        function updateStatus() {
+            document.getElementById('syncInfo').textContent =
+                `Yjs: ${updatesApplied} updates applied · ${updatesSent} sent · doc state ${Y.encodeStateAsUpdate(ydoc).length}B`;
+        }
+
+        ydoc.on('update', (update, origin) => {
+            if (origin === 'remote') return;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({type: 'update', payload: uint8ToBase64(update)}));
+                updatesSent++;
+                updateStatus();
+            }
+        });
+
+        ytext.observe(() => {
+            const newValue = ytext.toString();
+            if (newValue === editor.value) return;
+            const cursorPos = editor.selectionStart;
+            const wasAtEnd = cursorPos === editor.value.length;
+            editor.value = newValue;
+            lastValue = newValue;
+            const newPos = wasAtEnd ? newValue.length : Math.min(cursorPos, newValue.length);
+            editor.setSelectionRange(newPos, newPos);
+            updateStatus();
+        });
+
+        editor.addEventListener('input', () => {
+            const newValue = editor.value;
+            if (newValue === lastValue) return;
+            let prefix = 0;
+            while (prefix < lastValue.length && prefix < newValue.length
+                   && lastValue[prefix] === newValue[prefix]) prefix++;
+            let suffix = 0;
+            while (suffix < lastValue.length - prefix && suffix < newValue.length - prefix
+                   && lastValue[lastValue.length - 1 - suffix] === newValue[newValue.length - 1 - suffix]) suffix++;
+            const deleted = lastValue.length - prefix - suffix;
+            const inserted = newValue.substring(prefix, newValue.length - suffix);
+            ydoc.transact(() => {
+                if (deleted > 0) ytext.delete(prefix, deleted);
+                if (inserted.length > 0) ytext.insert(prefix, inserted);
+            });
+            lastValue = newValue;
+        });
 
         async function loadDoc() {
             try {
                 const res = await fetch(API + '/docs/' + docId, {
-                    headers: { 'Authorization': 'Bearer ' + token },
+                    headers: {'Authorization': 'Bearer ' + token},
                 });
                 const doc = await res.json();
                 document.getElementById('docTitle').textContent = doc.title || 'Untitled';
-                if (doc.content) {
-                    document.getElementById('editor').textContent = atob(doc.content);
-                }
             } catch (e) {
                 console.error('load doc:', e);
             }
@@ -105,6 +166,10 @@
             ws.onopen = () => {
                 document.getElementById('wsDot').className = 'ws-dot ws-connected';
                 document.getElementById('wsLabel').textContent = 'Connected';
+                const state = Y.encodeStateAsUpdate(ydoc);
+                if (state.length > 2) {
+                    ws.send(JSON.stringify({type: 'update', payload: uint8ToBase64(state)}));
+                }
             };
             ws.onclose = () => {
                 document.getElementById('wsDot').className = 'ws-dot ws-disconnected';
@@ -114,45 +179,22 @@
             ws.onmessage = (e) => {
                 try {
                     const msg = JSON.parse(e.data);
-                    if ((msg.type === 'update' || msg.type === 'sync') && msg.payload) {
-                        const text = atob(msg.payload);
-                        const sel = window.getSelection();
-                        const cursorOffset = sel.rangeCount ? sel.getRangeAt(0).startOffset : 0;
-                        isRemoteUpdate = true;
-                        editor.textContent = text;
-                        isRemoteUpdate = false;
-                        // Restore cursor position
-                        try {
-                            if (editor.firstChild) {
-                                const range = document.createRange();
-                                const pos = Math.min(cursorOffset, editor.firstChild.length);
-                                range.setStart(editor.firstChild, pos);
-                                range.collapse(true);
-                                sel.removeAllRanges();
-                                sel.addRange(range);
-                            }
-                        } catch (ex) {}
+                    if (msg.type === 'sync' && Array.isArray(msg.updates)) {
+                        for (const u of msg.updates) {
+                            Y.applyUpdate(ydoc, base64ToUint8(u), 'remote');
+                            updatesApplied++;
+                        }
+                        updateStatus();
+                    } else if (msg.type === 'update' && msg.payload) {
+                        Y.applyUpdate(ydoc, base64ToUint8(msg.payload), 'remote');
+                        updatesApplied++;
+                        updateStatus();
                     }
                 } catch (err) {
-                    console.log('ws message:', e.data);
+                    console.error('ws message:', err);
                 }
             };
         }
-
-        const editor = document.getElementById('editor');
-        let debounceTimer;
-        editor.addEventListener('input', () => {
-            if (isRemoteUpdate) return;
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'update',
-                        payload: btoa(editor.textContent),
-                    }));
-                }
-            }, 200);
-        });
 
         async function saveDoc() {
             const btn = document.getElementById('saveBtn');
@@ -166,7 +208,7 @@
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + token,
                     },
-                    body: JSON.stringify({ content: editor.textContent }),
+                    body: JSON.stringify({content: editor.value}),
                 });
                 if (res.ok) {
                     btn.className = 'btn-save saved';
@@ -178,15 +220,12 @@
                         hint.textContent = 'Cmd+S';
                     }, 2000);
                 } else {
-                    const data = await res.json();
                     btn.className = 'btn-save';
                     btn.textContent = 'Save';
-                    alert('Save failed: ' + (data.error || res.statusText));
                 }
             } catch (e) {
                 btn.className = 'btn-save';
                 btn.textContent = 'Save';
-                alert('Save failed: ' + e.message);
             }
         }
 
@@ -197,18 +236,17 @@
             }
         });
 
-        function openShareModal() {
+        window.openShareModal = () => {
             document.getElementById('shareModal').classList.add('active');
             document.getElementById('shareUsername').value = '';
             document.getElementById('shareMsg').style.display = 'none';
             document.getElementById('shareUsername').focus();
-        }
-
-        function closeShareModal() {
+        };
+        window.closeShareModal = () => {
             document.getElementById('shareModal').classList.remove('active');
-        }
-
-        async function shareDoc() {
+        };
+        window.saveDoc = saveDoc;
+        window.shareDoc = async () => {
             const username = document.getElementById('shareUsername').value.trim();
             if (!username) return;
             const msgEl = document.getElementById('shareMsg');
@@ -219,25 +257,23 @@
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + token,
                     },
-                    body: JSON.stringify({ username }),
+                    body: JSON.stringify({username}),
                 });
                 const data = await res.json();
                 if (res.ok) {
                     msgEl.textContent = 'Shared with ' + data.collaborator;
                     msgEl.className = 'share-msg ok';
-                    msgEl.style.display = 'block';
-                    document.getElementById('shareUsername').value = '';
                 } else {
                     msgEl.textContent = data.error || 'Share failed';
                     msgEl.className = 'share-msg err';
-                    msgEl.style.display = 'block';
                 }
+                msgEl.style.display = 'block';
             } catch (e) {
                 msgEl.textContent = 'Network error: ' + e.message;
                 msgEl.className = 'share-msg err';
                 msgEl.style.display = 'block';
             }
-        }
+        };
 
         document.getElementById('shareModal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('shareModal')) closeShareModal();

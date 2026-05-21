@@ -248,34 +248,35 @@ func (h *Hub) sendSync(c *Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	var content []byte
+	var updates [][]byte
 
-	streamKey := "doc:updates:" + c.DocID
-	msgs, err := h.rdb.XRevRangeN(ctx, streamKey, "+", "-", 1).Result()
-	if err == nil && len(msgs) > 0 {
-		if payload, ok := msgs[0].Values["payload"].(string); ok {
-			content = []byte(payload)
+	oid, err := primitive.ObjectIDFromHex(c.DocID)
+	if err == nil {
+		var doc struct {
+			YjsUpdates [][]byte `bson:"yjs_updates"`
+		}
+		if err := h.mongoDB.Collection("documents").FindOne(ctx, bson.M{"_id": oid}).Decode(&doc); err == nil {
+			updates = doc.YjsUpdates
 		}
 	}
 
-	if content == nil {
-		oid, err := primitive.ObjectIDFromHex(c.DocID)
-		if err != nil {
-			return
+	streamKey := "doc:updates:" + c.DocID
+	msgs, err := h.rdb.XRange(ctx, streamKey, "-", "+").Result()
+	if err == nil {
+		for _, m := range msgs {
+			if payload, ok := m.Values["payload"].(string); ok {
+				updates = append(updates, []byte(payload))
+			}
 		}
-		var doc struct {
-			Content []byte `bson:"content"`
-		}
-		err = h.mongoDB.Collection("documents").FindOne(ctx, bson.M{"_id": oid}).Decode(&doc)
-		if err != nil || len(doc.Content) == 0 {
-			return
-		}
-		content = doc.Content
+	}
+
+	if len(updates) == 0 {
+		return
 	}
 
 	msg, _ := json.Marshal(map[string]interface{}{
 		"type":    "sync",
-		"payload": content,
+		"updates": updates,
 	})
 	select {
 	case c.Send <- msg:

@@ -2,14 +2,11 @@ package stream
 
 import (
 	"context"
-	"encoding/json"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -22,53 +19,21 @@ import (
 var tracer = otel.Tracer("collab-service/snapshotter")
 
 const (
-	idleTimeout    = 5 * time.Second
+	idleTimeout     = 5 * time.Second
 	fallbackTimeout = 30 * time.Second
-	checkInterval  = 1 * time.Second
+	checkInterval   = 1 * time.Second
 )
-
-const mqQueue = "doc.index"
 
 type Snapshotter struct {
 	rdb     *redis.Client
 	mongoDB *mongo.Database
-	mqCh    *amqp.Channel
-	mqConn  *amqp.Connection
 }
 
 func NewSnapshotter(rdb *redis.Client, mongoDB *mongo.Database) *Snapshotter {
-	s := &Snapshotter{rdb: rdb, mongoDB: mongoDB}
-
-	mqURL := os.Getenv("RABBITMQ_URL")
-	if mqURL == "" {
-		mqURL = "amqp://guest:guest@localhost:5672/"
-	}
-	conn, err := amqp.Dial(mqURL)
-	if err != nil {
-		log.Printf("snapshotter: rabbitmq connect failed (index disabled): %v", err)
-		return s
-	}
-	ch, err := conn.Channel()
-	if err != nil {
-		conn.Close()
-		log.Printf("snapshotter: rabbitmq channel failed: %v", err)
-		return s
-	}
-	ch.QueueDeclare(mqQueue, true, false, false, false, nil)
-	s.mqConn = conn
-	s.mqCh = ch
-	log.Printf("snapshotter: rabbitmq connected, queue=%s", mqQueue)
-	return s
+	return &Snapshotter{rdb: rdb, mongoDB: mongoDB}
 }
 
-func (s *Snapshotter) Close() {
-	if s.mqCh != nil {
-		s.mqCh.Close()
-	}
-	if s.mqConn != nil {
-		s.mqConn.Close()
-	}
-}
+func (s *Snapshotter) Close() {}
 
 func (s *Snapshotter) Start(ctx context.Context) {
 	ticker := time.NewTicker(checkInterval)
@@ -129,63 +94,40 @@ func (s *Snapshotter) mergeStream(ctx context.Context, streamKey, docID, trigger
 	}
 	span.SetAttributes(attribute.Int("updates_merged", len(msgs)))
 
-	lastPayload, ok := msgs[len(msgs)-1].Values["payload"].(string)
-	if !ok || lastPayload == "" {
-		return
-	}
-
 	oid, err := primitive.ObjectIDFromHex(docID)
 	if err != nil {
 		log.Printf("snapshot: invalid doc_id %s: %v", docID, err)
 		return
 	}
 
+	updates := make([][]byte, 0, len(msgs))
+	ids := make([]string, len(msgs))
+	for i, m := range msgs {
+		ids[i] = m.ID
+		if payload, ok := m.Values["payload"].(string); ok && payload != "" {
+			updates = append(updates, []byte(payload))
+		}
+	}
+	if len(updates) == 0 {
+		return
+	}
+
 	coll := s.mongoDB.Collection("documents")
 	_, err = coll.UpdateOne(ctx,
 		bson.M{"_id": oid},
-		bson.M{"$set": bson.M{
-			"content":    []byte(lastPayload),
-			"updated_at": time.Now(),
-		}},
+		bson.M{
+			"$push": bson.M{"yjs_updates": bson.M{"$each": updates}},
+			"$set":  bson.M{"updated_at": time.Now()},
+		},
 	)
 	if err != nil {
 		log.Printf("snapshot: writeback doc=%s failed: %v", docID, err)
 		return
 	}
 
-	ids := make([]string, len(msgs))
-	for i, msg := range msgs {
-		ids[i] = msg.ID
-	}
 	s.rdb.XDel(ctx, streamKey, ids...)
 
-	log.Printf("snapshot: doc=%s merged %d updates (%s trigger)", docID, len(msgs), trigger)
-
-	s.publishIndex(ctx, oid, lastPayload)
-}
-
-func (s *Snapshotter) publishIndex(ctx context.Context, oid primitive.ObjectID, content string) {
-	if s.mqCh == nil {
-		return
-	}
-	var doc struct {
-		Title string `bson:"title"`
-	}
-	s.mongoDB.Collection("documents").FindOne(ctx, bson.M{"_id": oid}).Decode(&doc)
-
-	body, _ := json.Marshal(map[string]string{
-		"doc_id":  oid.Hex(),
-		"title":   doc.Title,
-		"content": content,
-	})
-	pubCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	if err := s.mqCh.PublishWithContext(pubCtx, "", mqQueue, false, false, amqp.Publishing{
-		ContentType: "application/json",
-		Body:        body,
-	}); err != nil {
-		log.Printf("snapshot: publish index for %s failed: %v", oid.Hex(), err)
-	}
+	log.Printf("snapshot: doc=%s persisted %d Yjs updates (%s trigger)", docID, len(updates), trigger)
 }
 
 func parseStreamTime(id string) time.Time {
